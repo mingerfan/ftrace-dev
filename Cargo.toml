@@ -1,0 +1,16 @@
+[package]
+name = "ftrace-dev"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+cbindgen = "0.26.0"
+
+[lib]
+name = "ftrace_dev"
+crate-type = ["staticlib"]
+
+[dependencies]
+libc = "0.2.152"

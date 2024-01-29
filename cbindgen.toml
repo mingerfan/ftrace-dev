@@ -1,0 +1,7 @@
+# see more in https://github.com/mozilla/cbindgen/blob/HEAD/docs.md
+language = "C"
+pragma_once = true
+sys_includes = []
+includes = []
+cpp_compat = true
+documentation = true
