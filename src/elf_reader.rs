@@ -5,6 +5,7 @@ use crate::{debug_println, debug_print};
 
 #[derive(PartialEq, Eq, Debug)]
 #[allow(dead_code)]
+#[non_exhaustive]
 enum FunType {
     LocalFunc,
     ExternalFunc,
@@ -21,7 +22,8 @@ struct Func {
 
 #[allow(dead_code)]
 struct FuncInstance {
-    id: i32,
+    id: u32,
+    func_type: FunType,
     para_num: Vec<u64>,
     start_time: u64,
     end_time: u64,
