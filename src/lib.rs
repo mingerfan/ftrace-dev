@@ -1,3 +1,5 @@
+mod elf_reader;
+
 // 由于libc的绑定比std的ffi更全，所以不使用ffi的c_char等类型
 use std::ffi::CStr;
 use libc::{c_int, c_char, c_uchar};
@@ -33,7 +35,7 @@ pub extern "C" fn print_string(in_string: *const c_char, m_len: usize) -> c_int 
         }
     };
     println!("{}", c_str_printable);
-    return RC_SUCCESS_CODE;
+    RC_SUCCESS_CODE
 }
 
 #[cfg(test)]
