@@ -13,4 +13,5 @@ name = "ftrace_dev"
 crate-type = ["staticlib"]
 
 [dependencies]
+elf = "0.7.4"
 libc = "0.2.152"
