@@ -4,14 +4,13 @@ use std::{cmp::Ordering, fs::File, path::PathBuf};
 use crate::{debug_println, debug_print};
 
 #[derive(PartialEq, Eq, Debug)]
-#[allow(dead_code)]
 #[non_exhaustive]
 pub enum FunType {
     LocalFunc,
     ExternalFunc,
 }
 
-#[allow(dead_code)]
+
 pub struct Func {
     pub id: u32,
     pub func_type: FunType,
@@ -21,10 +20,9 @@ pub struct Func {
 }
 
 
-#[allow(dead_code)]
-struct ElfReader {
+
+pub struct ElfReader {
     pub id: u32,
-    file: PathBuf,
     pub name: String,
     pub start: u64,
     pub end: u64,
@@ -32,9 +30,9 @@ struct ElfReader {
 }
 
 impl ElfReader {
-    pub fn new(id: u32, file: &PathBuf) -> Self {
-        let file_path = file.to_str().expect("Empty file path");
-        debug_println!("Elf file: {}", file_path);
+    pub fn new(id: u32, file: &str) -> Self {
+        debug_println!("Elf file: {}", file);
+        let file = &PathBuf::from(file);
         let name = file.file_stem().and_then(|f| f.to_str()).expect("Can not Convert to Str");
         let io = File::open(file).expect("Can not open file");
         let mut file_stream = ElfStream::<AnyEndian, _>::open_stream(io).expect("Open Failed");
@@ -88,7 +86,6 @@ impl ElfReader {
 
         ElfReader {
             id,
-            file: file.to_owned(),
             name: name.to_string(),
             start,
             end,
@@ -96,7 +93,7 @@ impl ElfReader {
         }
     }
 
-    fn find(&self, value: u64) -> Option<&Func> {
+    pub fn find(&self, value: u64) -> Option<&Func> {
         self.func_vec.binary_search_by(|x| {
             if value < x.start {
                 Ordering::Greater
@@ -115,8 +112,7 @@ mod tests {
     use rand::Rng;
 
     fn create_new(id: u32, path: &str) -> ElfReader {
-        let file = PathBuf::from(path);
-        ElfReader::new(id, &file)
+        ElfReader::new(id, path)
     }
 
     #[test]
