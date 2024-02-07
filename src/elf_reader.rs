@@ -152,6 +152,25 @@ mod tests {
     }
 
     #[test]
+    fn test_find() {
+        let elf_reader = create_new(0, "./test_elf/riscv64-nemu-interpreter");
+        let mut rng = rand::thread_rng();
+    
+        println!("\n===============To Test gap miss================");
+        let mut last_end = elf_reader.func_vec.first().unwrap().end;
+        for i in &elf_reader.func_vec {
+            if i.start > last_end {
+                let rand_addr = rng.gen_range(last_end..i.start);
+                print!("Random addr 0x{:X} between 0x{:X} and 0x{:X}, should miss\t", rand_addr, i.start, last_end);
+                assert!(elf_reader.find(rand_addr).is_none());
+                println!("Miss!")
+            }
+            last_end = i.end;
+        }
+    }
+
+    #[test]
+    // riscv elf
     fn test_find1() {
         let elf_reader1 = create_new(1, "./test_elf/nanos-lite-riscv64-nemu.elf");
         let mut rng = rand::thread_rng();
@@ -168,5 +187,22 @@ mod tests {
             assert!(elf_reader1.find(rand_addr).is_some());
             println!("Hit!");
         }
+
+        println!("\n===============To Test miss================");
+        let addr = elf_reader1.func_vec.first().unwrap().start - 1;
+        print!("Should miss addr(start - 1): 0x{:X}\t", addr);
+        assert!(elf_reader1.find(addr).is_none());
+        println!("Miss!");
+
+        let addr = elf_reader1.func_vec.last().unwrap().end;
+        print!("Should miss addr(end): 0x{:X}\t", addr);
+        assert!(elf_reader1.find(addr).is_none());
+        println!("Miss!");
+
+        let addr = addr + 1;
+        print!("Should miss addr(end + 1): 0x{:X}\t", addr);
+        assert!(elf_reader1.find(addr).is_none());
+        println!("Miss!");
     }
+
 }
