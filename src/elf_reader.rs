@@ -6,38 +6,29 @@ use crate::{debug_println, debug_print};
 #[derive(PartialEq, Eq, Debug)]
 #[allow(dead_code)]
 #[non_exhaustive]
-enum FunType {
+pub enum FunType {
     LocalFunc,
     ExternalFunc,
 }
 
 #[allow(dead_code)]
-struct Func {
-    id: u32,
-    func_type: FunType,
-    name: String,
-    start: u64,
-    end: u64,
+pub struct Func {
+    pub id: u32,
+    pub func_type: FunType,
+    pub name: String,
+    pub start: u64,
+    pub end: u64,
 }
 
-#[allow(dead_code)]
-struct FuncInstance {
-    id: u32,
-    func_type: FunType,
-    para_num: Vec<u64>,
-    start_time: u64,
-    end_time: u64,
-}
 
 #[allow(dead_code)]
 struct ElfReader {
-    id: u32,
+    pub id: u32,
     file: PathBuf,
-    name: String,
-    start: u64,
-    end: u64,
+    pub name: String,
+    pub start: u64,
+    pub end: u64,
     func_vec: Vec<Func>,
-    call_tracer: Vec<FuncInstance>,
 }
 
 impl ElfReader {
@@ -102,7 +93,6 @@ impl ElfReader {
             start,
             end,
             func_vec,
-            call_tracer: Vec::new(),
         }
     }
 

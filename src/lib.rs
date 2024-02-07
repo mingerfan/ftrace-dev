@@ -1,5 +1,6 @@
 mod elf_reader;
 mod utils;
+mod manager;
 
 // 由于libc的绑定比std的ffi更全，所以不使用ffi的c_char等类型
 use std::ffi::CStr;
