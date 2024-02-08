@@ -25,6 +25,23 @@ impl FuncInstance {
             end_time: start_time,
         }
     }
+
+    fn set_end_time(&mut self, end_time: u64) {
+        self.end_time = end_time
+    }
+
+    fn set_ret_val(&mut self, ret_val: (u64, Option<u64>), show_context: bool) {
+        if show_context {
+            self.ret_val = Some(ret_val);
+        } else {
+            self.ret_val = None;
+        }
+    }
+
+    fn set_end_and_ret(&mut self, end_time: u64, ret_val: (u64, Option<u64>), show_context: bool) {
+        self.set_end_time(end_time);
+        self.set_ret_val(ret_val, show_context);
+    }
 }
 
 
@@ -76,5 +93,6 @@ impl manager {
         }
     }
 
+    
     
 }
