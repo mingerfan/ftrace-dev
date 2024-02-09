@@ -1,11 +1,15 @@
 use crate::elf_reader::*;
+use crate::debug_println;
+// use std::cmp::Ordering;
 
+#[derive(PartialEq, Eq)]
 enum CurReader {
     MainReader,
     ProgsReader(usize),
 }
 
 struct FuncInstance {
+    // 这里instance的id主要是用于结合cur_reader定位函数信息位置的
     id: u32,
     func_type: FunType,
     ret_val: Option<(u64, Option<u64>)>,
@@ -60,12 +64,18 @@ impl manager {
         let prog_readers = if let Some(x) = progs_path {
             let mut prog_readers: Vec<ElfReader> = Vec::new();
             for (idx, i) in x.into_iter().enumerate() {
-                prog_readers.push(ElfReader::new(idx as u32, i));
+                prog_readers.push(ElfReader::new((idx+1) as u32, i));
+            }
+            prog_readers.sort_by(|a, b| a.start.cmp(&b.start));
+            for i in &prog_readers {
+                debug_println!("Progs elf reader: name {}, id {}", i.name, i.id);
             }
             Some(prog_readers)
         } else {
             None
         };
+
+
         
         manager {
             show_context,
@@ -94,5 +104,5 @@ impl manager {
     }
 
     
-    
+
 }
