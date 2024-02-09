@@ -11,6 +11,7 @@ enum CurReader {
 struct FuncInstance {
     // 这里instance的id主要是用于结合cur_reader定位函数信息位置的
     id: u32,
+    reader: CurReader,
     func_type: FunType,
     ret_val: Option<(u64, Option<u64>)>,
     paras: Option<Vec<u64>>,
@@ -19,9 +20,10 @@ struct FuncInstance {
 }
 
 impl FuncInstance {
-    fn new(id: u32, func_type: FunType, start_time: u64, paras: Option<Vec<u64>>) -> Self {
+    fn new(id: u32, func_type: FunType, reader: CurReader, start_time: u64, paras: Option<Vec<u64>>) -> Self {
         FuncInstance {
             id,
+            reader,
             func_type,
             ret_val: None,
             paras,
