@@ -3,7 +3,7 @@ use std::{cmp::Ordering, fs::File, path::PathBuf};
 
 use crate::{debug_println, debug_print};
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum FunType {
     LocalFunc,

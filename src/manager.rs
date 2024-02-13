@@ -4,7 +4,7 @@ use crate::debug_println;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::rc::Rc;
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 enum CurReader {
     MainReader,
     ProgsReader(usize),
