@@ -103,21 +103,30 @@ impl Manager {
         time - self.init_time
     }
 
-    fn cur_reader(&self) -> &ElfReader {
-        match self.cur_reader {
+    fn get_reader(&self, reader: &CurReader) -> &ElfReader {
+        match *reader {
             CurReader::MainReader => &self.main_reader,
             CurReader::ProgsReader(x) => {
                 let res = &self.prog_readers
                 .as_ref()
-                .expect("Option<Vec> is None, should not reach ProgsReader arm")[x]; 
+                .expect("Option<Vec> is None, should not reach ProgsReader arm")[x];
                 if res.id as usize == x {
                     res
                 } else {
-                    panic!("Reader id is not compatable with its index in the vec")
+                    panic!("Reader id is not compatible with its index in the vec")
                 }
             }
         }
     }
+
+    fn cur_reader(&self) -> &ElfReader {
+        self.get_reader(&self.cur_reader)
+    }
+
+    fn func_reader(&self, func: &FuncInstance) -> &ElfReader {
+        self.get_reader(&func.reader)
+    }
+
 
     pub fn first_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
         assert!(self.cur_reader == CurReader::MainReader, "Is not first function");
