@@ -104,6 +104,18 @@ impl ElfReader {
             }
         }).ok().and_then(|idx| self.func_vec.get(idx))
     }
+
+    pub fn get_func(&self, id: u32) -> Option<&Func>{
+        self.func_vec.get(id as usize)
+        .and_then(|x| {
+            if x.id == id {
+                Some(x)
+            } else {
+                debug_println!("Func id is not compatible with Vec index");
+                None
+            }
+        })
+    }
 }
 
 #[cfg(test)]
@@ -189,6 +201,16 @@ mod tests {
         print!("Should miss addr(end + 1): 0x{:X}\t", addr);
         assert!(elf_reader1.find(addr).is_none());
         println!("Miss!");
+    }
+
+    #[test]
+    fn test_get_func() {
+        let elf_reader = create_new(0, "./test_elf/riscv64-nemu-interpreter");
+        for i in 0..elf_reader.func_vec.len() {
+            let func = elf_reader.get_func(i as u32).unwrap();
+            println!("Func: {}, id: {}", func.name, func.id);
+        }
+        assert!(elf_reader.get_func(elf_reader.func_vec.len() as u32).is_none());
     }
 
 }
