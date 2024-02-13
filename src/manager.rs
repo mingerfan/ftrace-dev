@@ -120,7 +120,9 @@ impl Manager {
     }
 
     pub fn first_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
-        assert!(self.cur_reader == CurReader::MainReader);
+        assert!(self.cur_reader == CurReader::MainReader, "Is not first function");
+        assert!(self.func_stack.is_empty(), "Is not first function");
+        assert!(self.trace_log.is_empty(), "Is not first function");
         let func_info = match self.cur_reader().find(pc) {
             Some(x) => {
                 debug_println!("Init function add {} in Main Reader", x.name);
