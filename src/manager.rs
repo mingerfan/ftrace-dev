@@ -53,7 +53,7 @@ impl FuncInstance {
 }
 
 
-struct Manager {
+pub struct Manager {
     show_context: bool,
     main_reader: ElfReader,
     cur_reader: CurReader,
@@ -64,7 +64,7 @@ struct Manager {
 }
 
 impl Manager {
-    fn new(show_context: bool, main_path: &str, progs_path: Option<Vec<&str>>) -> Self {
+    pub fn new(show_context: bool, main_path: &str, progs_path: Option<Vec<&str>>) -> Self {
         let main_reader = ElfReader::new(0, main_path);
         let prog_readers = if let Some(x) = progs_path {
             let mut prog_readers: Vec<ElfReader> = Vec::new();
@@ -119,7 +119,7 @@ impl Manager {
         }
     }
 
-    fn first_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
+    pub fn first_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
         assert!(self.cur_reader == CurReader::MainReader);
         let func_info = match self.cur_reader().find(pc) {
             Some(x) => {
