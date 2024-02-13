@@ -1,6 +1,8 @@
 use crate::elf_reader::*;
 use crate::debug_println;
 // use std::cmp::Ordering;
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::rc::Rc;
 
 #[derive(PartialEq, Eq)]
 enum CurReader {
@@ -51,16 +53,17 @@ impl FuncInstance {
 }
 
 
-struct manager {
+struct Manager {
     show_context: bool,
     main_reader: ElfReader,
     cur_reader: CurReader,
     prog_readers: Option<Vec<ElfReader>>,
-    trace_log: Vec<FuncInstance>,
-    func_stack: Vec<FuncInstance>,
+    trace_log: Vec<Rc<FuncInstance>>,
+    func_stack: Vec<Rc<FuncInstance>>,
+    init_time: u64,
 }
 
-impl manager {
+impl Manager {
     fn new(show_context: bool, main_path: &str, progs_path: Option<Vec<&str>>) -> Self {
         let main_reader = ElfReader::new(0, main_path);
         let prog_readers = if let Some(x) = progs_path {
@@ -76,17 +79,28 @@ impl manager {
         } else {
             None
         };
-
-
+    
+        let init_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+        .as_millis()
+        as u64;
         
-        manager {
+        Manager {
             show_context,
             main_reader,
             cur_reader: CurReader::MainReader,
             prog_readers,
             trace_log: Vec::new(),
             func_stack: Vec::new(),
+            init_time,
         }
+    }
+
+    fn get_time(&self) -> u64 {
+        let time = SystemTime::now().duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis()
+        as u64;
+        time - self.init_time
     }
 
     fn cur_reader(&self) -> &ElfReader {
@@ -105,6 +119,27 @@ impl manager {
         }
     }
 
+    fn first_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
+        assert!(self.cur_reader == CurReader::MainReader);
+        let func_info = match self.cur_reader().find(pc) {
+            Some(x) => {
+                debug_println!("Init function add {} in Main Reader", x.name);
+                FuncInstance::new(x.id, FunType::LocalFunc, 
+                    CurReader::MainReader, 
+                    self.get_time(), paras)
+            },
+            None =>{
+                debug_println!("Init function add anonymous function");
+                // 此时没有检测到call，就应该认为是一个匿名的头部被添加
+                FuncInstance::new(0, FunType::ExternalFunc, 
+                    CurReader::MainReader, 
+                    self.get_time(), paras)
+            }
+        };
+        let func_info = Rc::new(func_info);
+        self.trace_log.push(func_info.clone());
+        self.func_stack.push(func_info);
+    }
     
 
 }
