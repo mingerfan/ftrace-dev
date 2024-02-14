@@ -108,6 +108,11 @@ impl Manager {
         let init_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
         .as_millis()
         as u64;
+
+        let prog_readers_ref = prog_readers
+        .as_ref()
+        .map(|x| x.iter().collect());
+        Self::check_reader_overlap(&main_reader, prog_readers_ref);
         
         Manager {
             show_context,
