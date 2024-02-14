@@ -64,6 +64,31 @@ pub struct Manager {
 }
 
 impl Manager {
+    // 这里依靠reader保证start一定小于等于end
+    // 同时这里一定是有序(start有序）的序列
+    // 如果有重叠返回true，否则返回false
+    fn check_reader_overlap(main_readers: &ElfReader, readers: Option<Vec<&ElfReader>>) -> bool {
+        if readers.is_none() {
+            false
+        } else if let Some(x) = readers {
+            let mut res = false;
+            for (i, &item) in x.iter().enumerate() {
+                assert!(item.start <= item.end);
+                let next = x.get(i+1);
+                if let Some(&next) = next {
+                    res = res || (item.end > next.start);
+                } 
+            };
+
+            for i in x {
+                res = res || (main_readers.start >= i.start && main_readers.start < i.end);
+            }
+            res
+        } else {
+            panic!("Should not reach here!")
+        }
+    }
+
     pub fn new(show_context: bool, main_path: &str, progs_path: Option<Vec<&str>>) -> Self {
         let main_reader = ElfReader::new(0, main_path);
         let prog_readers = if let Some(x) = progs_path {
@@ -153,4 +178,53 @@ impl Manager {
     }
     
 
+}
+
+#[cfg(test)]
+mod tests {
+    use std::vec;
+
+    use super::*;
+
+    fn create_new(id: u32, path: &str) -> ElfReader {
+        ElfReader::new(id, path)
+    }
+
+    #[test]
+    fn test_check_overlap() {
+        let reader = create_new(0, "./test_elf/riscv64-nemu-interpreter");
+        let reader1 = create_new(1, "./test_elf/nanos-lite-riscv64-nemu.elf");
+        let dummy = ElfReader::dummy(0, "dummy", 0x50000, 0x50005, None);
+        let dummy1 = ElfReader::dummy(1, "dummy1", 0x50005, 0x50008, None);
+
+        println!("============To test check overlap============");
+        print!("Test the same reader, should true:\t");
+        let res = Manager::check_reader_overlap(&reader, Some(vec![&reader]));
+        assert!(res);
+        println!("True!");
+
+        print!("Test the same reader(2), should true:\t");
+        let res = Manager::check_reader_overlap(&reader1, Some(vec![&reader1]));
+        assert!(res);
+        println!("True!");
+
+        print!("Only main reader, should false:\t");
+        let res = Manager::check_reader_overlap(&reader, None);
+        assert!(!res);
+        println!("False!");
+
+        print!("Test different reader, should false:\t");
+        let mut vec = vec![&reader1, &dummy, &dummy1];
+        vec.sort_by(|a, b| a.start.cmp(&b.start));
+        let res = Manager::check_reader_overlap(&reader, Some(vec));
+        assert!(!res);
+        println!("False!");
+
+        print!("Test different reader(2), should false:\t");
+        let mut vec = vec![&reader, &reader1, &dummy1];
+        vec.sort_by(|a, b| a.start.cmp(&b.start));
+        let res = Manager::check_reader_overlap(&dummy, Some(vec));
+        assert!(!res);
+        println!("False!");
+    }
 }

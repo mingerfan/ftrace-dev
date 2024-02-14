@@ -93,6 +93,21 @@ impl ElfReader {
         }
     }
 
+    #[cfg(test)]
+    pub fn dummy(id: u32, name: &str, start: u64, end: u64, func_vec: Option<Vec<Func>>) -> ElfReader {
+        ElfReader {
+            id,
+            name: name.to_string(),
+            start,
+            end,
+            func_vec: if let Some(func_vec) = func_vec {
+                func_vec
+            } else {
+                Vec::new()
+            }
+        }
+    }
+
     pub fn find(&self, value: u64) -> Option<&Func> {
         self.func_vec.binary_search_by(|x| {
             if value < x.start {
