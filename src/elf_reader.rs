@@ -116,6 +116,16 @@ impl ElfReader {
             }
         })
     }
+
+    pub fn reader_cmp(&self, pc: u64) -> Ordering {
+        if self.start > pc {
+            Ordering::Greater
+        } else if self.end <= pc {
+            Ordering::Less
+        } else {
+            Ordering::Equal
+        }
+    }
 }
 
 #[cfg(test)]
