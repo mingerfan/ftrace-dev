@@ -1,5 +1,6 @@
 use crate::elf_reader::*;
 use crate::debug_println;
+use std::cmp::Ordering;
 // use std::cmp::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::rc::Rc;
@@ -125,7 +126,7 @@ impl Manager {
         }
     }
 
-    fn get_time(&self) -> u64 {
+    pub fn get_time(&self) -> u64 {
         let time = SystemTime::now().duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis()
@@ -149,11 +150,11 @@ impl Manager {
         }
     }
 
-    fn cur_reader(&self) -> &ElfReader {
+    pub fn cur_reader(&self) -> &ElfReader {
         self.get_reader(&self.cur_reader)
     }
 
-    fn func_reader(&self, func: &FuncInstance) -> &ElfReader {
+    pub fn func_reader(&self, func: &FuncInstance) -> &ElfReader {
         self.get_reader(&func.reader)
     }
 
@@ -180,6 +181,38 @@ impl Manager {
         let func_info = Rc::new(func_info);
         self.trace_log.push(func_info.clone());
         self.func_stack.push(func_info);
+    }
+
+    fn check_bound(&self, func_ins: &FuncInstance, pc: u64) -> bool {
+        let reader = self.func_reader(func_ins);
+        let func = reader.get_func(func_ins.id)
+        .expect("Can not get function from function instance, maybe illegal instance");
+        (pc >= func.start) && (pc < func.end)
+    }
+
+    fn build_ins_and_push(&mut self, cur_reader: CurReader, pc: u64, paras: Option<Vec<u64>>) {
+        // 这里假设了已经找到了pc对应的reader
+        let reader = self.get_reader(&cur_reader);
+        let func = reader.find(pc);
+        if let Some(named_func) = func {
+            let func_ins = FuncInstance::new(named_func.id, named_func.func_type, 
+                cur_reader, 
+                self.get_time(), 
+                paras);
+            let func_ins = Rc::new(func_ins);
+            self.trace_log.push(func_ins.clone());
+            self.func_stack.push(func_ins);
+        } else {
+            // 如果没有找到，那就是匿名函数
+            let func_ins = FuncInstance::new(0, FunType::ExternalFunc, 
+                cur_reader, 
+                self.get_time(), 
+                paras);
+            let func_ins = Rc::new(func_ins);
+            self.trace_log.push(func_ins.clone());
+            self.func_stack.push(func_ins);
+        }
+        
     }
     
 
