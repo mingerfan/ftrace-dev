@@ -190,6 +190,32 @@ impl Manager {
         (pc >= func.start) && (pc < func.end)
     }
 
+    fn elfreader_to_curreader(&self, reader: &ElfReader) -> CurReader {
+        // 这里与new的时候分配给各个reader的id相关, 其中，主id为0，其它从1开始
+        // 需要进行校验
+        let id = reader.id;
+        if id == 0 {
+            assert!(id == self.main_reader.id);
+            assert!(reader.start == self.main_reader.start);
+            assert!(reader.end == self.main_reader.end);
+            assert!(reader.name == self.main_reader.name);
+            CurReader::MainReader
+        } else {
+            // 此时不在main reader，需要进行各种校验
+            if let Some(x) = &self.prog_readers {
+                let res_reader = x.get((id-1) as usize)
+                .expect("Can not find target prog reader");
+                assert!(id == res_reader.id);
+                assert!(reader.start == res_reader.start);
+                assert!(reader.end == res_reader.end);
+                assert!(reader.name == res_reader.name);
+                CurReader::ProgsReader((id-1) as usize)
+            } else {
+                panic!("Prog readers vec does not exist, convert failed!");
+            }
+        }
+    }
+
     fn build_ins_and_push(&mut self, cur_reader: CurReader, pc: u64, paras: Option<Vec<u64>>) {
         // 这里假设了已经找到了pc对应的reader
         let reader = self.get_reader(&cur_reader);
@@ -264,5 +290,20 @@ mod tests {
         let res = Manager::check_reader_overlap(&dummy, Some(vec));
         assert!(!res);
         println!("False!");
+    }
+
+    #[test]
+    fn test_converter() {
+        let manager = Manager::new(false, 
+            "./test_elf/riscv64-nemu-interpreter", 
+            Some(vec!["./test_elf/nanos-lite-riscv64-nemu.elf"]));
+        let main_reader = &manager.main_reader;
+        let prog_reader = &manager.prog_readers.as_ref().unwrap()[0];
+        println!("============To test converter============");
+        assert!(manager.elfreader_to_curreader(main_reader) == CurReader::MainReader);
+        assert!(manager.elfreader_to_curreader(prog_reader) == CurReader::ProgsReader(0));
+        assert!(prog_reader.id == 1);
+        println!("Prog reader id = {}", prog_reader.id);
+        println!("Test converter pass!");
     }
 }
