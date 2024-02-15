@@ -8,7 +8,7 @@ use std::rc::Rc;
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum CurReader {
     MainReader,
-    ProgsReader(usize),
+    ProgReaders(usize),
 }
 
 struct FuncInstance {
@@ -137,10 +137,10 @@ impl Manager {
     fn get_reader(&self, reader: &CurReader) -> &ElfReader {
         match *reader {
             CurReader::MainReader => &self.main_reader,
-            CurReader::ProgsReader(x) => {
+            CurReader::ProgReaders(x) => {
                 let res = &self.prog_readers
                 .as_ref()
-                .expect("Option<Vec> is None, should not reach ProgsReader arm")[x];
+                .expect("Option<Vec> is None, should not reach ProgReaders arm")[x];
                 if res.id as usize == x {
                     res
                 } else {
@@ -209,7 +209,7 @@ impl Manager {
                 assert!(reader.start == res_reader.start);
                 assert!(reader.end == res_reader.end);
                 assert!(reader.name == res_reader.name);
-                CurReader::ProgsReader((id-1) as usize)
+                CurReader::ProgReaders((id-1) as usize)
             } else {
                 panic!("Prog readers vec does not exist, convert failed!");
             }
@@ -301,7 +301,7 @@ mod tests {
         let prog_reader = &manager.prog_readers.as_ref().unwrap()[0];
         println!("============To test converter============");
         assert!(manager.elfreader_to_curreader(main_reader) == CurReader::MainReader);
-        assert!(manager.elfreader_to_curreader(prog_reader) == CurReader::ProgsReader(0));
+        assert!(manager.elfreader_to_curreader(prog_reader) == CurReader::ProgReaders(0));
         assert!(prog_reader.id == 1);
         println!("Prog reader id = {}", prog_reader.id);
         println!("Test converter pass!");
