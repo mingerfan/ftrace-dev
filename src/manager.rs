@@ -14,7 +14,7 @@ enum CurReader {
 struct FuncInstance {
     // 这里instance的id主要是用于结合cur_reader定位函数信息位置的
     id: u32,
-    reader: CurReader,
+    reader: Option<CurReader>,
     func_type: FunType,
     ret_val: Option<(u64, Option<u64>)>,
     paras: Option<Vec<u64>>,
@@ -26,7 +26,19 @@ impl FuncInstance {
     fn new(id: u32, func_type: FunType, reader: CurReader, start_time: u64, paras: Option<Vec<u64>>) -> Self {
         FuncInstance {
             id,
-            reader,
+            reader: Some(reader),
+            func_type,
+            ret_val: None,
+            paras,
+            start_time,
+            end_time: start_time,
+        }
+    }
+
+    fn new_with_nullreader(id: u32, func_type: FunType, start_time: u64, paras: Option<Vec<u64>>) -> Self {
+        FuncInstance {
+            id,
+            reader: None,
             func_type,
             ret_val: None,
             paras,
@@ -154,8 +166,12 @@ impl Manager {
         self.get_reader(&self.cur_reader)
     }
 
-    pub fn func_reader(&self, func: &FuncInstance) -> &ElfReader {
-        self.get_reader(&func.reader)
+    pub fn func_reader(&self, func: &FuncInstance) -> Option<&ElfReader> {
+        if let Some(reader) = func.reader.as_ref() {
+            Some(self.get_reader(reader))
+        } else {
+            None
+        }
     }
 
 
@@ -184,10 +200,33 @@ impl Manager {
     }
 
     fn check_bound(&self, func_ins: &FuncInstance, pc: u64) -> bool {
+        // 确认pc在函数的范围内，如果在范围内返回true，不在就返回false
         let reader = self.func_reader(func_ins);
-        let func = reader.get_func(func_ins.id)
-        .expect("Can not get function from function instance, maybe illegal instance");
-        (pc >= func.start) && (pc < func.end)
+        if let Some(reader) = reader {
+            let func = reader.get_func(func_ins.id)
+            .expect("Can not get function from function instance, maybe illegal instance");
+            if func.func_type == FunType::LocalFunc {
+                // 如果是local func，用func自带的bound进行判断
+                (pc >= func.start) && (pc < func.end)
+            } else {
+                // 如果是external func，可以用func的上下函数进行判断
+                // 如果在上下函数之间，我们姑且认为是同一个函数
+                let upper_bound = if func.id == 0 {
+                    reader.start
+                } else {
+                    reader.get_func(func.id - 1).expect("Unexpected behaviour")
+                    .end
+                };
+                let lower_bound = reader.get_func(func.id + 1)
+                .map(|x| x.start)
+                .unwrap_or(reader.end);
+                (pc >= upper_bound) && (pc < lower_bound)
+            }
+        } else {
+            // 没有reader一定是外部函数，而且无法判断，进行assert确认，
+            // 并且返回false，表示始终在func_ins的范围外
+            false
+        }
     }
 
     fn elfreader_to_curreader(&self, reader: &ElfReader) -> CurReader {
