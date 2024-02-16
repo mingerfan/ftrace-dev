@@ -11,7 +11,7 @@ enum CurReader {
     ProgReaders(usize),
 }
 
-struct FuncInstance {
+pub struct FuncInstance {
     // 这里instance的id主要是用于结合cur_reader定位函数信息位置的
     id: u32,
     reader: Option<CurReader>,
@@ -63,6 +63,22 @@ impl FuncInstance {
     fn set_end_and_ret(&mut self, end_time: u64, ret_val: (u64, Option<u64>), show_context: bool) {
         self.set_end_time(end_time);
         self.set_ret_val(ret_val, show_context);
+    }
+
+    fn ret_val(&self) -> Option<(u64, Option<u64>)> {
+        self.ret_val
+    }
+
+    fn paras(&self) -> Option<&Vec<u64>> {
+        self.paras.as_ref()
+    }
+
+    fn start_time(&self) -> u64 {
+        self.start_time
+    }
+
+    fn end_time(&self) -> u64{
+        self.end_time
     }
 }
 
@@ -176,7 +192,7 @@ impl Manager {
     }
 
 
-    pub fn first_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
+    fn first_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
         assert!(self.cur_reader == CurReader::MainReader, "Is not first function");
         assert!(self.func_stack.is_empty(), "Is not first function");
         assert!(self.trace_log.is_empty(), "Is not first function");
@@ -287,7 +303,7 @@ impl Manager {
         
     }
     
-    pub fn noram_add_funtion(&mut self, pc: u64, paras: Option<Vec<u64>>) {
+    fn noram_add_funtion(&mut self, pc: u64, paras: Option<Vec<u64>>) {
         // 这个函数假设了已经需要切换函数（也就是check_bound失败）
         // 这个函数需要切换cur reader
         assert!(!self.trace_log.is_empty());
