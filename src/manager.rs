@@ -35,11 +35,12 @@ impl FuncInstance {
         }
     }
 
-    fn new_with_nullreader(id: u32, func_type: FunType, start_time: u64, paras: Option<Vec<u64>>) -> Self {
+    fn new_with_nullreader(id: u32, start_time: u64, paras: Option<Vec<u64>>) -> Self {
+        // 没有reader的函数一定时external的
         FuncInstance {
             id,
             reader: None,
-            func_type,
+            func_type: FunType::ExternalFunc,
             ret_val: None,
             paras,
             start_time,
@@ -275,11 +276,55 @@ impl Manager {
                 paras);
             let func_ins = Rc::new(func_ins);
             self.trace_log.push(func_ins.clone());
-            self.func_stack.push(func_ins);
+            // 由于是匿名函数，所以应该检查栈顶部是否是匿名函数
+            // 如果是就不继续添加，不是就继续添加
+            if let Some(x) = self.func_stack.last() {
+                if x.func_type == FunType::LocalFunc {
+                    self.func_stack.push(func_ins);
+                }
+            }
         }
         
     }
     
+    pub fn noram_add_funtion(&mut self, pc: u64, paras: Option<Vec<u64>>) {
+        // 这个函数假设了已经需要切换函数（也就是check_bound失败）
+        // 这个函数需要切换cur reader
+        assert!(!self.trace_log.is_empty());
+        let cur_reader = self.cur_reader();
+        if cur_reader.reader_cmp(pc) == Ordering::Equal {
+            let reader_enum = self.elfreader_to_curreader(cur_reader);
+            self.build_ins_and_push(reader_enum, pc, paras);
+        } else if self.main_reader.reader_cmp(pc) == Ordering::Equal {
+            let reader_enum = self.elfreader_to_curreader(&self.main_reader);
+            self.cur_reader = reader_enum;
+            self.build_ins_and_push(reader_enum, pc, paras);
+        } else {
+            let readers = self.prog_readers.as_ref()
+            .expect("Can not find prog readers vec, abort!");
+            let reader_opt = readers.iter().find(|x| {
+                x.reader_cmp(pc) == Ordering::Equal
+            });
+            if let Some(reader) = reader_opt {
+                let reader_enum = self.elfreader_to_curreader(reader);
+                self.cur_reader = reader_enum;
+                self.build_ins_and_push(reader_enum, pc, paras);
+            } else {
+                // 此时就是不在所有elf范围的外部（匿名）函数
+                // 这时候打印一些信息，但是仍然作为外部函数进行添加
+                debug_println!("The current pc: {} does not have a compatible reader, 
+                add as an anonymous function instance", pc);
+                let func_ins = FuncInstance::new_with_nullreader(0, self.get_time(), paras);
+                let func_ins = Rc::new(func_ins);
+                self.trace_log.push(func_ins.clone());
+                if let Some(x) = self.func_stack.last() {
+                    if x.func_type == FunType::LocalFunc {
+                        self.func_stack.push(func_ins);
+                    }
+                }
+            }
+        }
+    }
 
 }
 
