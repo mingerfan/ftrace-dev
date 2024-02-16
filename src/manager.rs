@@ -65,19 +65,19 @@ impl FuncInstance {
         self.set_ret_val(ret_val, show_context);
     }
 
-    fn ret_val(&self) -> Option<(u64, Option<u64>)> {
+    pub fn ret_val(&self) -> Option<(u64, Option<u64>)> {
         self.ret_val
     }
 
-    fn paras(&self) -> Option<&Vec<u64>> {
+    pub fn paras(&self) -> Option<&Vec<u64>> {
         self.paras.as_ref()
     }
 
-    fn start_time(&self) -> u64 {
+    pub fn start_time(&self) -> u64 {
         self.start_time
     }
 
-    fn end_time(&self) -> u64{
+    pub fn end_time(&self) -> u64{
         self.end_time
     }
 }
