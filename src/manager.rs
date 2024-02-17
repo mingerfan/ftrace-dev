@@ -2,7 +2,9 @@ use libc::ssize_t;
 
 use crate::elf_reader::*;
 use crate::debug_println;
+use core::panic;
 use std::cmp::Ordering;
+use std::collections::btree_map::IterMut;
 // use std::cmp::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::rc::Rc;
@@ -344,7 +346,7 @@ impl Manager {
         }
     }
 
-    fn jmp_check_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
+    pub fn jmp_check_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
         if self.trace_log.is_empty() {
             assert!(self.func_stack.is_empty());
             self.first_add_function(pc, paras);
@@ -355,6 +357,34 @@ impl Manager {
                 self.noram_add_function(pc, paras);
             }
         }
+    }
+
+    // 这里的pc需要传入返回后的第一条指令的pc，返回值则是在ret的时候收集的
+    pub fn ret_pop_function(&mut self, pc: u64, ret_val: Option<(u64, Option<u64>)>) {
+        let mut has_ext = false;
+        let res = self.func_stack.iter().enumerate()
+        .find(|(_, item)| {
+            if item.func_type == FunType::ExternalFunc {
+                has_ext |= true;
+                return false;
+            } 
+            self.check_bound(item, pc)
+        });
+
+        if let Some((idx, _)) = res {
+            self.func_stack.truncate(idx+1);
+        } else if !has_ext {
+            // 因为如果栈内没有外部函数，就不可能返回到区域外
+            // 要么就是我写错了，要么就是有一些我不了解的机制
+            // 这时候就直接panic了
+            panic!("Unexpected behaviour, abort!");
+        } else {
+            return;
+        }
+    }
+
+    pub fn func_stack(&self) -> &Vec<Rc<FuncInstance>> {
+        &self.func_stack
     }
 
 }
