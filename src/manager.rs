@@ -1,3 +1,5 @@
+use libc::ssize_t;
+
 use crate::elf_reader::*;
 use crate::debug_println;
 use std::cmp::Ordering;
@@ -303,7 +305,7 @@ impl Manager {
         
     }
     
-    fn noram_add_funtion(&mut self, pc: u64, paras: Option<Vec<u64>>) {
+    fn noram_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
         // 这个函数假设了已经需要切换函数（也就是check_bound失败）
         // 这个函数需要切换cur reader
         assert!(!self.trace_log.is_empty());
@@ -338,6 +340,19 @@ impl Manager {
                         self.func_stack.push(func_ins);
                     }
                 }
+            }
+        }
+    }
+
+    fn jmp_check_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
+        if self.trace_log.is_empty() {
+            assert!(self.func_stack.is_empty());
+            self.first_add_function(pc, paras);
+        } else {
+            let last_func = self.trace_log.last()
+            .expect("Last func is null, unexpected behaviour");
+            if self.check_bound(last_func, pc) {
+                self.noram_add_function(pc, paras);
             }
         }
     }
