@@ -447,4 +447,20 @@ mod tests {
         println!("Prog reader id = {}", prog_reader.id);
         println!("Test converter pass!");
     }
+
+    #[test]
+    fn test_add_and_pop() {
+        let manager = Manager::new(false, 
+            "./test_elf/riscv64-nemu-interpreter", 
+            Some(vec!["./test_elf/nanos-lite-riscv64-nemu.elf"]));
+        let main_reader = &manager.main_reader;
+        let prog_reader = &manager.prog_readers.as_ref().unwrap()[0];
+
+        println!("============To test add and pop============");
+        // 测试main reader的函数调用
+        for i in main_reader.func_vec() {
+            
+        }
+        
+    }
 }
