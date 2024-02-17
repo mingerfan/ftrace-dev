@@ -1,11 +1,7 @@
-use libc::ssize_t;
-
 use crate::elf_reader::*;
 use crate::debug_println;
 use core::panic;
 use std::cmp::Ordering;
-use std::collections::btree_map::IterMut;
-// use std::cmp::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::rc::Rc;
 
@@ -27,26 +23,26 @@ pub struct FuncInstance {
 }
 
 impl FuncInstance {
-    fn new(id: u32, func_type: FunType, reader: CurReader, start_time: u64, paras: Option<Vec<u64>>) -> Self {
+    fn new(id: u32, func_type: FunType, reader: CurReader, start_time: u64, paras: Option<&Vec<u64>>) -> Self {
         FuncInstance {
             id,
             reader: Some(reader),
             func_type,
             ret_val: None,
-            paras,
+            paras: paras.cloned(),
             start_time,
             end_time: start_time,
         }
     }
 
-    fn new_with_nullreader(id: u32, start_time: u64, paras: Option<Vec<u64>>) -> Self {
+    fn new_with_nullreader(id: u32, start_time: u64, paras: Option<&Vec<u64>>) -> Self {
         // 没有reader的函数一定时external的
         FuncInstance {
             id,
             reader: None,
             func_type: FunType::ExternalFunc,
             ret_val: None,
-            paras,
+            paras: paras.cloned(),
             start_time,
             end_time: start_time,
         }
@@ -196,7 +192,7 @@ impl Manager {
     }
 
 
-    fn first_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
+    fn first_add_function(&mut self, pc: u64, paras: Option<&Vec<u64>>) {
         assert!(self.cur_reader == CurReader::MainReader, "Is not first function");
         assert!(self.func_stack.is_empty(), "Is not first function");
         assert!(self.trace_log.is_empty(), "Is not first function");
@@ -276,7 +272,7 @@ impl Manager {
         }
     }
 
-    fn build_ins_and_push(&mut self, cur_reader: CurReader, pc: u64, paras: Option<Vec<u64>>) {
+    fn build_ins_and_push(&mut self, cur_reader: CurReader, pc: u64, paras: Option<&Vec<u64>>) {
         // 这里假设了已经找到了pc对应的reader
         let reader = self.get_reader(&cur_reader);
         let func = reader.find(pc);
@@ -307,7 +303,7 @@ impl Manager {
         
     }
     
-    fn noram_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
+    fn noram_add_function(&mut self, pc: u64, paras: Option<&Vec<u64>>) {
         // 这个函数假设了已经需要切换函数（也就是check_bound失败）
         // 这个函数需要切换cur reader
         assert!(!self.trace_log.is_empty());
@@ -346,7 +342,7 @@ impl Manager {
         }
     }
 
-    pub fn jmp_check_add_function(&mut self, pc: u64, paras: Option<Vec<u64>>) {
+    pub fn jmp_check_add_function(&mut self, pc: u64, paras: Option<&Vec<u64>>) {
         if self.trace_log.is_empty() {
             assert!(self.func_stack.is_empty());
             self.first_add_function(pc, paras);

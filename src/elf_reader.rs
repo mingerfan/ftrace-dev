@@ -132,6 +132,10 @@ impl ElfReader {
         })
     }
 
+    pub fn func_vec(&self) -> &[Func] {
+        &self.func_vec
+    }
+
     pub fn reader_cmp(&self, pc: u64) -> Ordering {
         if self.start > pc {
             Ordering::Greater
