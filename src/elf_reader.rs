@@ -10,7 +10,7 @@ pub enum FunType {
     ExternalFunc,
 }
 
-
+#[derive(Clone)]
 pub struct Func {
     pub id: u32,
     pub func_type: FunType,
@@ -20,7 +20,7 @@ pub struct Func {
 }
 
 
-
+#[derive(Clone)]
 pub struct ElfReader {
     pub id: u32,
     pub name: String,

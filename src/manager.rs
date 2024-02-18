@@ -4,6 +4,7 @@ use core::panic;
 use std::cmp::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::rc::Rc;
+use std::cell::Cell;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum CurReader {
@@ -16,69 +17,69 @@ pub struct FuncInstance {
     id: u32,
     reader: Option<CurReader>,
     func_type: FunType,
-    ret_val: Option<(u64, Option<u64>)>,
+    ret_val: Cell<Option<(u64, Option<u64>)>>,
     paras: Option<Vec<u64>>,
-    start_time: u64,
-    end_time: u64,
+    _start_time: u64,
+    _end_time: Cell<u64>,
 }
 
 impl FuncInstance {
-    fn new(id: u32, func_type: FunType, reader: CurReader, start_time: u64, paras: Option<&Vec<u64>>) -> Self {
+    fn new(id: u32, func_type: FunType, reader: CurReader, _start_time: u64, paras: Option<&Vec<u64>>) -> Self {
         FuncInstance {
             id,
             reader: Some(reader),
             func_type,
-            ret_val: None,
+            ret_val: Cell::new(None),
             paras: paras.cloned(),
-            start_time,
-            end_time: start_time,
+            _start_time,
+            _end_time: Cell::new(_start_time),
         }
     }
 
-    fn new_with_nullreader(id: u32, start_time: u64, paras: Option<&Vec<u64>>) -> Self {
+    fn new_with_nullreader(id: u32, _start_time: u64, paras: Option<&Vec<u64>>) -> Self {
         // 没有reader的函数一定时external的
         FuncInstance {
             id,
             reader: None,
             func_type: FunType::ExternalFunc,
-            ret_val: None,
+            ret_val: Cell::new(None),
             paras: paras.cloned(),
-            start_time,
-            end_time: start_time,
+            _start_time,
+            _end_time: Cell::new(_start_time),
         }
     }
 
-    fn set_end_time(&mut self, end_time: u64) {
-        self.end_time = end_time
+    fn set_end_time(&self, end_time: u64) {
+        self._end_time.set(end_time)
     }
 
-    fn set_ret_val(&mut self, ret_val: (u64, Option<u64>), show_context: bool) {
+    fn set_ret_val(&self, ret_val: (u64, Option<u64>), show_context: bool) {
         if show_context {
-            self.ret_val = Some(ret_val);
+            self.ret_val.set(Some(ret_val));
         } else {
-            self.ret_val = None;
+            self.ret_val.set(None);
         }
     }
 
-    fn set_end_and_ret(&mut self, end_time: u64, ret_val: (u64, Option<u64>), show_context: bool) {
+    fn set_end_and_ret(&self, end_time: u64, ret_val: (u64, Option<u64>), show_context: bool) {
         self.set_end_time(end_time);
         self.set_ret_val(ret_val, show_context);
     }
 
     pub fn ret_val(&self) -> Option<(u64, Option<u64>)> {
-        self.ret_val
+        self.ret_val.get()
     }
 
     pub fn paras(&self) -> Option<&Vec<u64>> {
         self.paras.as_ref()
     }
 
-    pub fn start_time(&self) -> u64 {
-        self.start_time
+    pub fn _start_time(&self) -> u64 {
+        self._start_time
     }
 
-    pub fn end_time(&self) -> u64{
-        self.end_time
+    pub fn _end_time(&self) -> u64{
+        self._end_time.get()
     }
 }
 
@@ -89,6 +90,7 @@ pub struct Manager {
     cur_reader: CurReader,
     prog_readers: Option<Vec<ElfReader>>,
     trace_log: Vec<Rc<FuncInstance>>,
+    time_base: Vec<u64>,
     func_stack: Vec<Rc<FuncInstance>>,
     init_time: u64,
 }
@@ -150,6 +152,7 @@ impl Manager {
             cur_reader: CurReader::MainReader,
             prog_readers,
             trace_log: Vec::new(),
+            time_base: Vec::new(),
             func_stack: Vec::new(),
             init_time,
         }
@@ -191,6 +194,12 @@ impl Manager {
         }
     }
 
+    fn trace_log_push(&mut self, elem: Rc<FuncInstance>) {
+        // 这是为了保证所有的trace_log被push进入元素的时候都携带一个时间戳
+        self.trace_log.push(elem);
+        self.time_base.push(self.get_time());
+    }
+
 
     fn first_add_function(&mut self, pc: u64, paras: Option<&Vec<u64>>) {
         assert!(self.cur_reader == CurReader::MainReader, "Is not first function");
@@ -212,7 +221,7 @@ impl Manager {
             }
         };
         let func_info = Rc::new(func_info);
-        self.trace_log.push(func_info.clone());
+        self.trace_log_push(func_info.clone());
         self.func_stack.push(func_info);
     }
 
@@ -282,7 +291,7 @@ impl Manager {
                 self.get_time(), 
                 paras);
             let func_ins = Rc::new(func_ins);
-            self.trace_log.push(func_ins.clone());
+            self.trace_log_push(func_ins.clone());
             self.func_stack.push(func_ins);
         } else {
             // 如果没有找到，那就是匿名函数
@@ -291,7 +300,7 @@ impl Manager {
                 self.get_time(), 
                 paras);
             let func_ins = Rc::new(func_ins);
-            self.trace_log.push(func_ins.clone());
+            self.trace_log_push(func_ins.clone());
             // 由于是匿名函数，所以应该检查栈顶部是否是匿名函数
             // 如果是就不继续添加，不是就继续添加
             if let Some(x) = self.func_stack.last() {
@@ -332,7 +341,7 @@ impl Manager {
                 add as an anonymous function instance", pc);
                 let func_ins = FuncInstance::new_with_nullreader(0, self.get_time(), paras);
                 let func_ins = Rc::new(func_ins);
-                self.trace_log.push(func_ins.clone());
+                self.trace_log_push(func_ins.clone());
                 if let Some(x) = self.func_stack.last() {
                     if x.func_type == FunType::LocalFunc {
                         self.func_stack.push(func_ins);
@@ -356,7 +365,13 @@ impl Manager {
     }
 
     // 这里的pc需要传入返回后的第一条指令的pc，返回值则是在ret的时候收集的
-    pub fn ret_pop_function(&mut self, pc: u64, ret_val: Option<(u64, Option<u64>)>) {
+    pub fn ret_pop_function(&mut self, pc: u64, ret_val: (u64, Option<u64>)) {
+        // Cell救我狗命
+
+        let cur_func = self.trace_log.last()
+        .expect("Ret must have current Function");
+        cur_func.set_end_and_ret(self.get_time(), ret_val, self.show_context);
+
         let mut has_ext = false;
         let res = self.func_stack.iter().enumerate()
         .find(|(_, item)| {
@@ -367,8 +382,21 @@ impl Manager {
             self.check_bound(item, pc)
         });
 
-        if let Some((idx, _)) = res {
-            self.func_stack.truncate(idx+1);
+        if let Some((idx, target)) = res {
+            if idx == self.func_stack.len() - 1 {
+                panic!("Ret target is on the top of ret stack, Unexpected behaviour");
+            }
+            let t_id = target.id;
+            let t_reader = target.reader;
+            let target = target.clone();
+            while let Some(element) = self.func_stack.pop() {
+                if self.func_stack.len() == idx - 1 {
+                    assert!(element.id == t_id);
+                    assert!(element.reader == t_reader);
+                    break;
+                }
+            }
+            self.trace_log_push(target);
         } else if !has_ext {
             // 因为如果栈内没有外部函数，就不可能返回到区域外
             // 要么就是我写错了，要么就是有一些我不了解的机制
