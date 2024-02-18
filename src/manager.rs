@@ -1,6 +1,7 @@
 use crate::elf_reader::*;
 use crate::debug_println;
 use core::panic;
+use std::arch::x86_64;
 use std::cmp::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::rc::Rc;
@@ -300,7 +301,11 @@ impl Manager {
                 self.get_time(), 
                 paras);
             let func_ins = Rc::new(func_ins);
-            self.trace_log_push(func_ins.clone());
+            if let Some(x) = self.trace_log.last() {
+                if x.func_type == FunType::LocalFunc {
+                    self.trace_log_push(func_ins.clone());
+                }
+            }
             // 由于是匿名函数，所以应该检查栈顶部是否是匿名函数
             // 如果是就不继续添加，不是就继续添加
             if let Some(x) = self.func_stack.last() {
@@ -337,11 +342,15 @@ impl Manager {
             } else {
                 // 此时就是不在所有elf范围的外部（匿名）函数
                 // 这时候打印一些信息，但是仍然作为外部函数进行添加
-                debug_println!("The current pc: {} does not have a compatible reader, 
+                debug_println!("The current pc: 0x{:X} does not have a compatible reader, 
                 add as an anonymous function instance", pc);
                 let func_ins = FuncInstance::new_with_nullreader(0, self.get_time(), paras);
                 let func_ins = Rc::new(func_ins);
-                self.trace_log_push(func_ins.clone());
+                if let Some(x) = self.trace_log.last() {
+                    if x.func_type == FunType::LocalFunc {
+                        self.trace_log_push(func_ins.clone());
+                    }
+                }
                 if let Some(x) = self.func_stack.last() {
                     if x.func_type == FunType::LocalFunc {
                         self.func_stack.push(func_ins);
@@ -351,6 +360,8 @@ impl Manager {
         }
     }
 
+    // 这里的external和elf_reader的func vec的external意义不完全相同
+    // 如果找不到就会标记external，所以manager的external算是func vec的external的超集
     pub fn jmp_check_add_function(&mut self, pc: u64, paras: Option<&Vec<u64>>) {
         if self.trace_log.is_empty() {
             assert!(self.func_stack.is_empty());
@@ -358,7 +369,7 @@ impl Manager {
         } else {
             let last_func = self.trace_log.last()
             .expect("Last func is null, unexpected behaviour");
-            if self.check_bound(last_func, pc) {
+            if !self.check_bound(last_func, pc) {
                 self.noram_add_function(pc, paras);
             }
         }
@@ -418,6 +429,8 @@ mod tests {
     use std::vec;
 
     use super::*;
+    use std::thread;
+    use std::time::Duration;
 
     fn create_new(id: u32, path: &str) -> ElfReader {
         ElfReader::new(id, path)
@@ -478,17 +491,42 @@ mod tests {
 
     #[test]
     fn test_add_and_pop() {
-        let manager = Manager::new(false, 
+        let mut manager = Manager::new(false, 
             "./test_elf/riscv64-nemu-interpreter", 
             Some(vec!["./test_elf/nanos-lite-riscv64-nemu.elf"]));
-        let main_reader = &manager.main_reader;
-        let prog_reader = &manager.prog_readers.as_ref().unwrap()[0];
+        let main_reader = &manager.main_reader.clone();
+        let prog_reader = &manager.prog_readers.clone().as_ref().unwrap()[0];
 
         println!("============To test add and pop============");
         // 测试main reader的函数调用
-        for i in main_reader.func_vec() {
-            
+        for func in main_reader.func_vec().iter().skip(2) {
+            manager.jmp_check_add_function(func.start, None);
+            let func_ins = manager.func_stack.last().unwrap();
+            let func_ins1 = manager.trace_log.last().unwrap();
+            assert!(func_ins.id == func_ins1.id);
+            assert!(func_ins.reader == func_ins1.reader);
+            if func.func_type == FunType::LocalFunc && func.start != func.end {
+                assert!(func_ins.id == func.id);
+                assert!(func_ins.reader.unwrap() == CurReader::MainReader);
+            } else if func.func_type == FunType::LocalFunc && func.start == func.end {
+                assert!(func_ins.id == 0);
+            } else {
+                assert!(func_ins.reader.is_none());
+                assert!(func_ins.func_type == FunType::ExternalFunc);
+            }
+            thread::sleep(Duration::from_micros(50));
         }
-        
+
+        println!("=============cur vec==============");
+        for (func_ins, time) in manager.trace_log
+        .iter()
+        .zip(manager.time_base.iter()) {
+            let reader = manager.func_reader(func_ins).unwrap();
+            if func_ins.func_type != FunType::ExternalFunc {
+                println!("time: {}, function: {}", time, reader.get_func(func_ins.id).unwrap().name);
+            } else {
+                println!("time: {}, unknown function", time);
+            }
+        }
     }
 }

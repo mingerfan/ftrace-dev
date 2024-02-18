@@ -139,7 +139,10 @@ impl ElfReader {
     pub fn reader_cmp(&self, pc: u64) -> Ordering {
         if self.start > pc {
             Ordering::Greater
-        } else if self.end <= pc {
+        } else if self.end < pc {
+            // 虽然end的确是开区间
+            // 但是需要考虑到一些elf的结尾函数是start==end的情况
+            // 所以故意这么写
             Ordering::Less
         } else {
             Ordering::Equal
