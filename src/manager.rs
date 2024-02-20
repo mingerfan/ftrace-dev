@@ -175,7 +175,7 @@ impl Manager {
                 let res = &self.prog_readers
                 .as_ref()
                 .expect("Option<Vec> is None, should not reach ProgReaders arm")[x];
-                if res.id as usize == x {
+                if res.id as usize == x + 1 {
                     res
                 } else {
                     panic!("Reader id is not compatible with its index in the vec")
@@ -453,6 +453,8 @@ mod tests {
     use super::*;
     use std::thread;
     use std::time::Duration;
+    use std::fs::File;
+    use std::io::Write;
 
     const RED_START: &str = "\x1b[31m";
     const RED_END: &str = "\x1b[0m";
@@ -524,7 +526,8 @@ mod tests {
             "./test_elf/riscv64-nemu-interpreter", 
             Some(vec!["./test_elf/nanos-lite-riscv64-nemu.elf"]));
         let main_reader = &manager.main_reader.clone();
-        let prog_reader = &manager.prog_readers.clone().as_ref().unwrap()[0];
+        let prog_reader = &manager.prog_readers.clone().unwrap()[0];
+        let file = File::create("./target/log.txt").unwrap();
 
         println!("\n==========================To test add and pop==========================");
         // 测试main reader的函数调用
@@ -546,27 +549,33 @@ mod tests {
             thread::sleep(Duration::from_micros(50));
         }
 
-        fn print_log(manager: &Manager) {
-            println!("\n==========================cur vec==========================");
+        fn print_log(manager: &Manager, mut file: &File) {
+            if manager.trace_log.len() >= 3000 {
+                return;
+            }
+            writeln!(file, "\n==========================cur vec==========================").unwrap();
             for (func_ins, time) in manager.trace_log
             .iter()
             .zip(manager.time_base.iter()) {
                 if func_ins.func_type != FunType::ExternalFunc {
                     let func = manager.get_func_from_ins(func_ins).unwrap();
-                    println!("time: {}, function: {},\t \
+                    writeln!(file, "time: {}, function: {},\t \
                     ret_val: {:?},\t start_time: {}, end_time: {}", time, 
                     func.name,
                     func_ins.ret_val(),
                     func_ins._start_time(),
                     func_ins._end_time(),
-                    );
+                    ).unwrap();
                 } else {
-                    println!("time: {}, unknown function", time);
+                    writeln!(file, "time: {}, unknown function", time).unwrap();
                 }
             }
         }
 
         fn print_stack(manager: &Manager) {
+            if manager.func_stack().len() >= 500 {
+                return;
+            }
             println!("\n==========================cur stack===========================");
             for func_ins in manager.func_stack() {
                 if func_ins.func_type != FunType::ExternalFunc {
@@ -578,29 +587,36 @@ mod tests {
             }
         }
 
-        for i in (20..manager.func_stack().len()).rev() {
-            let func_ins = &manager.func_stack()[i].clone();
-            let stack_len = manager.func_stack().len();
-            if func_ins.func_type == FunType::LocalFunc {
-                let func = manager.get_func_from_ins(func_ins).unwrap();
-                manager.ret_pop_function(func.start, None);
-                assert!(manager.func_stack().last().unwrap().id == func_ins.id);
-                assert!(manager.func_stack().last().unwrap().reader == Some(CurReader::MainReader));
-                assert!(manager.trace_log.last().unwrap().id == func_ins.id);
-                assert!(manager.trace_log.last().unwrap().reader == Some(CurReader::MainReader));
-            } else {
-                // 这时候我们输入一个在栈中找不到的函数的地址
-                // 理论上来说，它不会弹出这个内容
-                manager.ret_pop_function(0x2710, None);
-                assert!(stack_len == manager.func_stack().len());
-                assert!(manager.func_stack().last().unwrap().id == 0);
-                assert!(manager.func_stack().last().unwrap().reader == Some(CurReader::MainReader));
-                assert!(manager.trace_log.last().unwrap().id == 0);
-                assert!(manager.trace_log.last().unwrap().func_type == FunType::ExternalFunc);
-            }
+        fn pop(manager: &mut Manager, range: std::ops::Range<usize>) {
+            for i in range.rev() {
+                let func_ins = &manager.func_stack()[i].clone();
+                let stack_len = manager.func_stack().len();
+                if func_ins.func_type == FunType::LocalFunc {
+                    let func = manager.get_func_from_ins(func_ins).unwrap();
+                    // println!("Pop func: {}", func.name);
+                    manager.ret_pop_function(func.start, None);
+                    assert!(manager.func_stack().last().unwrap().id == func_ins.id);
+                    assert!(manager.func_stack().last().unwrap().reader == func_ins.reader);
+                    assert!(manager.trace_log.last().unwrap().id == func_ins.id);
+                    assert!(manager.trace_log.last().unwrap().reader == func_ins.reader);
+                } else {
+                    // 这时候我们输入一个在栈中找不到的函数的地址
+                    // 理论上来说，它不会弹出这个内容
+                    manager.ret_pop_function(0x2710, None);
+                    // println!("Pop none");
+                    assert!(stack_len == manager.func_stack().len());
+                    assert!(manager.func_stack().last().unwrap().id == 0);
+                    assert!(manager.func_stack().last().unwrap().reader == func_ins.reader);
+                    assert!(manager.trace_log.last().unwrap().id == 0);
+                    assert!(manager.trace_log.last().unwrap().func_type == FunType::ExternalFunc);
+                }
 
+            }
         }
-        print_stack(&manager);
+        // 这时候不能包括最后一个元素，因为它是当前正在运行的函数
+        let range = 20..(manager.func_stack().len()-1);
+        pop(&mut manager, range);
+
         // 以下三个函数是main reader内确定的三个函数，用于测试
         let func = manager.get_func_from_ins(&manager.func_stack()[2]).unwrap().to_owned();
         println!("{}Return to a function, id: {}, name: {} {}", BLUE_START, 
@@ -634,6 +650,101 @@ mod tests {
 
         print_stack(&manager);
 
-        print_log(&manager);
+        // 接下来是测试progs reader的调用
+        println!("\n==========================Subtest: Progs reader==========================");
+        for func in prog_reader.func_vec().iter() {
+            manager.jmp_check_add_function(func.start, None);
+            let func_ins = manager.func_stack.last().unwrap();
+            let func_ins1 = manager.trace_log.last().unwrap();
+            assert!(func_ins.id == func_ins1.id);
+            assert!(func_ins.reader == func_ins1.reader);
+            if func.func_type == FunType::LocalFunc && func.start != func.end {
+                assert!(func_ins.id == func.id);
+                assert!(func_ins.reader.unwrap() == CurReader::ProgReaders(0));
+            } else if func.func_type == FunType::LocalFunc && func.start == func.end {
+                assert!(func_ins.id == 0);
+            } else {
+                assert!(func_ins.reader.is_none());
+                assert!(func_ins.func_type == FunType::ExternalFunc);
+            }
+            thread::sleep(Duration::from_micros(50));
+        }
+
+        // 这时候不能包括最后一个元素，因为它是当前正在运行的函数
+        // 测试progs reader的弹出
+        let range = 20..(manager.func_stack().len()-1);
+        pop(&mut manager, range);
+
+        // 测试多次调用同一个无法检测的函数prog reader的start
+        manager.jmp_check_add_function(0x80000000, None);
+        // 此时栈顶应该多一个空函数
+        assert!(manager.func_stack().last().unwrap().id == 0);
+        assert!(manager.func_stack().last().unwrap().func_type == FunType::ExternalFunc);
+        assert!(manager.trace_log.last().unwrap().id == 0);
+        assert!(manager.trace_log.last().unwrap().func_type == FunType::ExternalFunc);
+        let stack_len = manager.func_stack().len();
+        let log_len = manager.trace_log.len();
+        manager.jmp_check_add_function(0x80000000, None);
+        manager.jmp_check_add_function(0x80000000, None);
+        manager.jmp_check_add_function(0x80000000, None);
+        // 这时候都不应该添加新元素
+        assert!(manager.func_stack().len() == stack_len);
+        assert!(manager.trace_log.len() == log_len);
+
+        // 添加一个新元素后测试不在所有reader的函数添加以及其返回
+        manager.jmp_check_add_function(0x800013BC, None);
+        
+        // 不在所有reader内的函数
+        manager.jmp_check_add_function(0x90000000, None);
+        // 此时栈顶应该多一个空函数
+        assert!(manager.func_stack().last().unwrap().id == 0);
+        assert!(manager.func_stack().last().unwrap().func_type == FunType::ExternalFunc);
+        assert!(manager.trace_log.last().unwrap().id == 0);
+        assert!(manager.trace_log.last().unwrap().func_type == FunType::ExternalFunc);
+        let stack_len = manager.func_stack().len();
+        let log_len = manager.trace_log.len();
+        manager.jmp_check_add_function(0x90000000, None);
+        manager.jmp_check_add_function(0x80000000, None);
+        manager.jmp_check_add_function(0x90000000, None);
+        // 这时候都不应该添加新元素
+        assert!(manager.func_stack().len() == stack_len);
+        assert!(manager.trace_log.len() == log_len);
+
+        // 测试unknown函数返回
+        manager.ret_pop_function(0x800013BC, None);
+        // 简单测试一下就可以了
+        assert!(manager.get_func_from_ins(manager.func_stack()
+            .last().unwrap()).unwrap().name == "memset");
+        assert!(manager.get_func_from_ins(manager.trace_log
+            .last().unwrap()).unwrap().name == "memset");
+        assert!(manager.func_stack().last().unwrap().func_type == FunType::LocalFunc);
+        assert!(manager.trace_log.last().unwrap().func_type == FunType::LocalFunc);
+
+        print_stack(&manager);
+
+        // 再测试直接返回main reader
+        manager.ret_pop_function(0x2705, None); // _start
+        assert!(manager.get_func_from_ins(manager.func_stack()
+            .last().unwrap()).unwrap().name == "_start");
+        assert!(manager.get_func_from_ins(manager.trace_log
+            .last().unwrap()).unwrap().name == "_start");
+
+        print_stack(&manager);
+
+        print_log(&manager, &file);
+        
+        let func_ins_size = std::mem::size_of::<FuncInstance>();
+        println!("Current Log memory used by elements is: {}, memory allocated is: {}", 
+        manager.trace_log.len() * func_ins_size, manager.trace_log.capacity() * func_ins_size);
+
+        // 接下来是压力测试，用于测试大数据下的内存占用
+        println!("\n==========================Stress testing==========================");
+        for _ in 0..500_000 {
+            manager.jmp_check_add_function(0x800013BC, None);
+            manager.jmp_check_add_function(0x4510, None);
+        }
+        println!("Current Log memory used by elements is: {}, memory allocated is: {}", 
+        manager.trace_log.len() * func_ins_size, manager.trace_log.capacity() * func_ins_size);
+        // 这时候千万不能print_log，会爆炸的
     }
 }
