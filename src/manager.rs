@@ -1,9 +1,7 @@
 use crate::elf_reader::*;
 use crate::debug_println;
 use core::panic;
-use std::arch::x86_64;
 use std::cmp::Ordering;
-use std::io::Seek;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::rc::Rc;
 use std::cell::Cell;
@@ -734,6 +732,7 @@ mod tests {
         print_log(&manager, &file);
         
         let func_ins_size = std::mem::size_of::<FuncInstance>();
+        println!("Sizeof FuncInstance: {}", func_ins_size);
         println!("Current Log memory used by elements is: {}, memory allocated is: {}", 
         manager.trace_log.len() * func_ins_size, manager.trace_log.capacity() * func_ins_size);
 

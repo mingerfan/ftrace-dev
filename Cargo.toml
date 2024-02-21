@@ -13,6 +13,8 @@ name = "ftrace_dev"
 crate-type = ["staticlib"]
 
 [dependencies]
+bitpattern = "0.1.0"
 elf = "0.7.4"
+lazy_static = "1.4.0"
 libc = "0.2.152"
 rand = "0.8.5"
