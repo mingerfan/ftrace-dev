@@ -1,6 +1,7 @@
 use crate::elf_reader::*;
 use crate::debug_println;
 use core::panic;
+use std::cell::{Ref, RefCell};
 use std::cmp::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::rc::Rc;
@@ -18,7 +19,7 @@ pub struct FuncInstance {
     reader: Option<CurReader>,
     func_type: FunType,
     ret_val: Cell<Option<(u64, Option<u64>)>>,
-    paras: Option<Vec<u64>>,
+    paras: RefCell<Option<Vec<u64>>>,
     _start_time: u64,
     _end_time: Cell<u64>,
 }
@@ -30,7 +31,7 @@ impl FuncInstance {
             reader: Some(reader),
             func_type,
             ret_val: Cell::new(None),
-            paras: paras.cloned(),
+            paras: RefCell::new(paras.cloned()),
             _start_time,
             _end_time: Cell::new(_start_time),
         }
@@ -43,7 +44,7 @@ impl FuncInstance {
             reader: None,
             func_type: FunType::ExternalFunc,
             ret_val: Cell::new(None),
-            paras: paras.cloned(),
+            paras: RefCell::new(paras.cloned()),
             _start_time,
             _end_time: Cell::new(_start_time),
         }
@@ -70,8 +71,13 @@ impl FuncInstance {
         self.ret_val.get()
     }
 
-    pub fn paras(&self) -> Option<&Vec<u64>> {
-        self.paras.as_ref()
+    pub fn paras(&self) -> Ref<Option<Vec<u64>>> {
+        self.paras.borrow()
+    }
+
+    fn set_paras(&self, paras: Option<Vec<u64>>) {
+        let mut paras_ = self.paras.borrow_mut();
+        *paras_ = paras;
     }
 
     pub fn _start_time(&self) -> u64 {
@@ -416,6 +422,8 @@ impl Manager {
                 } else {
                     // 为弹出的函数设置end_time
                     element.set_end_time(self.get_time());
+                    // 将弹出函数的参数设置为None，避免内存占用过大
+                    element.set_paras(None);
                 }
             }
             let elem = self.func_stack.last()
