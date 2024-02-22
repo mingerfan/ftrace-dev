@@ -1,6 +1,7 @@
-
+mod manager;
+mod elf_reader;
 use std::{cell::RefCell, sync::Mutex};
-use crate::manager::*;
+use manager::*;
 use std::collections::HashSet;
 use bitpattern::bitpattern;
 

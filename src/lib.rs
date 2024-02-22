@@ -1,6 +1,4 @@
-mod elf_reader;
 mod utils;
-mod manager;
 mod ftrace;
 
 // 由于libc的绑定比std的ffi更全，所以不使用ffi的c_char等类型
@@ -9,6 +7,7 @@ use libc::{c_int, c_char, c_uchar};
 
 pub const RC_ERROR_CODE: c_int = -1;
 pub const RC_SUCCESS_CODE: c_int = 0;
+use ftrace::*;
 
 #[no_mangle]
 pub extern "C" fn add(left: usize, right: usize) -> usize {

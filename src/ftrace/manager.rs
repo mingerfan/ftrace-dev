@@ -1,4 +1,4 @@
-use crate::elf_reader::*;
+use super::elf_reader::*;
 use crate::debug_println;
 use core::panic;
 use std::cell::{Ref, RefCell};
