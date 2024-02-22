@@ -1,6 +1,6 @@
 
-use std::{borrow::BorrowMut, cell::RefCell, sync::Mutex};
-use crate::manager::{self, *};
+use std::{cell::RefCell, sync::Mutex};
+use crate::manager::*;
 use std::collections::HashSet;
 use bitpattern::bitpattern;
 
@@ -13,6 +13,12 @@ struct ManagerBuilder {
     show_context: bool,
     main_path: String,
     progs_path: Option<HashSet<String>>
+}
+
+#[derive(PartialEq, Eq)]
+enum ImmType {
+    I,
+    J,
 }
 
 thread_local! {
@@ -86,7 +92,52 @@ pub fn build_builder() {
     }
 }
 
+fn sign_extend_to_u64(value: u64, bit_width: u8) -> u64 {
+    // 检查位宽是否有效（1至64之间，因为我们扩展到64位）
+    if bit_width == 0 || bit_width > 64 {
+        panic!("bit_width must be between 1 and 64");
+    }
+    
+    // 如果位宽已经是64位，直接返回值
+    if bit_width == 64 {
+        return value;
+    }
+    
+    // 创建一个掩码，它将在原始数值的符号位上有一个单一的1，其余位都是0。
+    let mask = 1u64 << (bit_width - 1);
+    
+    // 检查符号位是否被设置（是否为负数）
+    if value & mask == 0 {
+        // 如果符号位为0，直接返回值，因为没有符号扩展的需要
+        value
+    } else {
+        // 如果符号位为1，执行符号扩展：
+        // 将掩码的所有位取反得到一个新掩码，这个新掩码将用于生成符号扩展位
+        // 然后通过或操作(|)将这些扩展位添加到原始值上
+        let sign_ext = !((1u64 << bit_width) - 1);
+        value | sign_ext
+    }
+}
+
+fn bits(value: u64, a: u8, b: u8) -> u64 {
+    if a < b || a > 63 {
+        panic!("Invalid range: a must be greater than or equal to b, and a must be less than 64.");
+    }
+    
+    // 创建一个掩码，它在位于 a 和 b 之间的每一位上都是1
+    let mask = ((1u64 << (a - b + 1)) - 1) << b;
+
+    // 应用掩码，然后右移 b 位
+    (value & mask) >> b
+}
+
+
+fn bitmask(bits: u8) -> u64 {
+    (1u64 << bits) - 1
+}
+
 #[allow(dead_code)]
+#[cfg(test)]
 fn check_instruction_print(inst: u32) {
     if bitpattern!("???????_?????_?????_???_?????_11011_11", inst).is_some() {
         // jal
@@ -97,22 +148,70 @@ fn check_instruction_print(inst: u32) {
     }
 }
 
-fn bit_slice(n: u32, high: u8, low: u8) -> u32 {
-    if high < low {
-        panic!("high must be greater than or equal to low");
+fn get_imm(inst: u32, imm_type: ImmType) -> u64 {
+    let i = inst as u64;
+    match imm_type {
+        ImmType::I => {
+            sign_extend_to_u64(bits(i, 31, 20), 12)
+        }
+        ImmType::J => {
+            sign_extend_to_u64(bits(i, 31, 31), 1) << 20 |
+            bits(i, 19, 12) << 12    |
+            bits(i, 20, 20) << 11    |
+            bits(i, 30, 25) << 5     |
+            bits(i, 24, 21) << 1
+        }
+        _ => panic!()
     }
-    (n >> low) & ((1 << (high - low + 1)) - 1)
 }
 
-// pub fn check_instruction(pc: u64, inst: u32) {
-//     let target_pc = if bitpattern!("???????_?????_?????_???_?????_11011_11", inst).is_some() {
-//         // jal
-//         let immj = 
-//     } else if bitpattern!("???????_?????_?????_000_?????_11001_11", inst).is_some() {
-//         // jalr
-        
-//     }
-// }
+
+pub fn check_instruction(pc: u64, inst: u32, regs: &[u64]) {
+    // 这里的pc是当前指令的pc，通过这个来计算出来跳转到的地址
+    let target_pc = if bitpattern!("???????_?????_?????_???_?????_11011_11", inst).is_some() {
+        // jal
+        let immj = get_imm(inst, ImmType::J);
+        immj + pc
+    } else if bitpattern!("???????_?????_?????_000_?????_11001_11", inst).is_some() {
+        // jalr
+        let immi = get_imm(inst, ImmType::I);
+        (immi + regs[bits(inst as u64, 19, 15) as usize]) & !(bitmask(1))
+    } else {
+        panic!("Unexpected behaviour")
+    };
+    G_MANAGER.with(|elem| {
+        let mut manager = elem.borrow_mut();
+        if let Some(ref mut manager) = *manager {
+            let inst = inst as u64;
+            if (bits(inst, 19, 15) == 1) && (bits(inst, 11, 7) == 0) {
+                // 首先判断是否是return
+                // riscv用x10和x11返回值
+                manager.ret_pop_function(target_pc, Some((regs[10], Some(regs[11]))));
+            } else {
+                // 这里对于Paras的参数设计有问题，应该直接要求顶层传入有所有权的内容
+                // 只能降低效率了
+                let regs = regs.to_owned();
+                manager.jmp_check_add_function(target_pc, Some(&regs));
+            }
+        }
+    });
+}
+
+#[allow(dead_code)]
+#[cfg(test)]
+fn target_pc_gen(pc: u64, inst: u32, regs: &[u64]) -> u64 {
+    if bitpattern!("???????_?????_?????_???_?????_11011_11", inst).is_some() {
+        // jal
+        let immj = get_imm(inst, ImmType::J);
+        immj + pc
+    } else if bitpattern!("???????_?????_?????_000_?????_11001_11", inst).is_some() {
+        // jalr
+        let immi = get_imm(inst, ImmType::I);
+        (immi + regs[bits(inst as u64, 19, 15) as usize]) & !(bitmask(1))
+    } else {
+        panic!("Unexpected behaviour")
+    }
+} 
 
 #[cfg(test)]
 mod test {
