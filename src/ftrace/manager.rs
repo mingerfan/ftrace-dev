@@ -7,8 +7,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::rc::Rc;
 use std::cell::Cell;
 
-#[derive(PartialEq, Eq, Clone, Copy)]
-enum CurReader {
+#[derive(PartialEq, Eq, Clone, Copy, Hash)]
+pub enum CurReader {
     MainReader,
     ProgReaders(usize),
 }
@@ -65,6 +65,18 @@ impl FuncInstance {
     fn set_end_and_ret(&self, end_time: u64, ret_val: Option<(u64, Option<u64>)>, show_context: bool) {
         self.set_end_time(end_time);
         self.set_ret_val(ret_val, show_context);
+    }
+
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    pub fn reader(&self) -> Option<CurReader> {
+        self.reader
+    } 
+
+    pub fn func_type(&self) -> FunType {
+        self.func_type
     }
 
     pub fn ret_val(&self) -> Option<(u64, Option<u64>)> {
@@ -172,7 +184,7 @@ impl Manager {
         time - self.init_time
     }
 
-    fn get_reader(&self, reader: &CurReader) -> &ElfReader {
+    pub fn get_reader(&self, reader: &CurReader) -> &ElfReader {
         match *reader {
             CurReader::MainReader => &self.main_reader,
             CurReader::ProgReaders(x) => {
@@ -215,6 +227,17 @@ impl Manager {
         self.time_base.push(self.get_time());
     }
 
+    pub fn get_time_from_index(&self, idx: usize) -> u64 {
+        self.time_base[idx]
+    }
+
+    pub fn get_time_base_end(&self) -> u64 {
+        if let Some(time) = self.time_base.last() {
+            time.to_owned()
+        } else {
+            0
+        }
+    }
 
     fn first_add_function(&mut self, pc: u64, paras: Option<&Vec<u64>>) {
         assert!(self.cur_reader == CurReader::MainReader, "Is not first function");
@@ -448,6 +471,10 @@ impl Manager {
 
     pub fn func_stack(&self) -> &Vec<Rc<FuncInstance>> {
         &self.func_stack
+    }
+
+    pub fn trace_log(&self) -> &Vec<Rc<FuncInstance>> {
+        &self.trace_log
     }
 
 }

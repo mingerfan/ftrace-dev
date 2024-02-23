@@ -1,9 +1,13 @@
 mod manager;
 mod elf_reader;
-use std::{cell::RefCell, sync::Mutex};
+use std::{cell::RefCell, collections::HashMap, fs::File, rc::Rc, sync::Mutex};
 use manager::*;
 use std::collections::HashSet;
 use bitpattern::bitpattern;
+use std::io::Write;
+
+
+use self::elf_reader::FunType;
 
 
 // 这里用了unsafe，实际上我不会在任何多线程来修改这些数据
@@ -198,6 +202,113 @@ pub fn check_instruction(pc: u64, inst: u32, regs: &[u64]) {
     });
 }
 
+pub fn print_stack(path: String) {
+    G_MANAGER.with(|elem| {
+        if let Some(ref mut manager) = *elem.borrow_mut() {
+            let file = File::create(path);
+            if let Ok(mut file) = file {
+                let stack = manager.func_stack();
+                let stack_iter = stack.iter()
+                .enumerate()
+                .map(|(idx, elem)| {
+                    (stack.len() - (idx + 1), elem)
+                }).rev();
+                writeln!(file, "========================STACK TRACE========================").unwrap();
+                for (idx, elem) in stack_iter {
+                    let func = manager.get_func_from_ins(elem);
+                    if let Some(func) = func {
+                        writeln!(file, "@{}, function: {}, start: {}, end: {} ", 
+                        idx, 
+                        func.name,
+                        func.start, func.end).unwrap();
+                    } else {
+                        writeln!(file, "@{}, function: unknown", idx).unwrap();
+                    }
+                }
+            } else {
+                println!("Error: can not open file");
+            }
+        } else {
+            println!("Warning: Manager is NULL");
+        }
+    })
+}
+
+type LogTransItem = (Option<CurReader>, Vec<(u64, Rc<FuncInstance>)>);
+type LogTrans = Vec<LogTransItem>;
+fn log_translation(manager: &Manager) ->  LogTrans {
+    type MyHash = HashMap<(u32, Option<CurReader>, FunType), Vec<(u64, Rc<FuncInstance>)>>;
+    let log = manager.trace_log();
+    let mut hashset: MyHash = HashMap::new();
+    for (idx, i) in log.iter().enumerate() {
+        let key = if i.reader().is_some() { 
+            (i.id(), i.reader(), i.func_type()) 
+        } else { 
+            (0, None, FunType::ExternalFunc) 
+        };
+        match hashset.get_mut(&key) {
+            Some(elem) => {
+                // 每一个Vec内一定是有序的，因为log就是按时间有序的
+                elem.push((manager.get_time_from_index(idx), i.clone()));
+            },
+            None => { 
+                let func = manager.get_func_from_ins(i);
+                hashset.insert(key, Vec::new()); 
+            },
+        }
+    }
+    let mut log_vec = hashset.into_iter()
+    .map(|(key, val)| (key.1, val))
+    .collect::<Vec<_>>();
+    log_vec.sort_by_key(|(_, time_vec)| time_vec[0].0);
+    log_vec
+}
+
+fn print_scale(mut file: &File, scale: f64) {
+    // 打印时基
+    write!(file, "{:60}", "TIME_SCALE").unwrap();
+    for i in 0..3500 {
+        write!(file, "{:>30.1}", i as f64*scale*30_f64).unwrap();
+    }
+    writeln!(file).unwrap();
+}
+
+fn print_oneline(mut file: &File, manager: &Manager, vec_item: LogTransItem) {
+    let (reader, vec) = vec_item;
+    if reader.is_none() {
+        write!(file,"{:60}", "Unknown Reader@Unknown Function[@Unknown Address]").unwrap();
+    } else if let Some(reader) = reader {
+        if vec[0].1.func_type() == FunType::LocalFunc {
+            
+        } else {
+            let text = 
+            format!("{}@Unknown Function[@Unknown Address]", manager.get_reader(&reader).name);
+            write!(file, "{:30}", text).unwrap();
+        }
+    }
+}
+
+pub fn print_log(path: String) {
+    G_MANAGER.with(|elem| {
+        if let Some(ref mut manager) = *elem.borrow_mut() {
+            let file = File::create(path);
+            if let Ok(mut file) = file {
+                let log_vec = log_translation(manager);
+                let end_time = manager.get_time_base_end() as f64;
+                let scale: f64 = end_time/10000_f64; // 以分成10000份为基准
+                print_scale(&file, scale);
+                for item in log_vec {
+                    print_oneline(&file, manager, item);
+                }
+            } else {
+                println!("Error: can not open file");
+            }
+        } else {
+            println!("Warning: Manager is NULL");
+        }
+    })
+}
+
 #[allow(dead_code)]
 #[cfg(test)]
 fn target_pc_gen(pc: u64, inst: u32, regs: &[u64]) -> u64 {
@@ -224,5 +335,11 @@ mod test {
         check_instruction_print(0xc81ff0ef);
         // 000780e7 jalr
         check_instruction_print(0x000780e7);
+    }
+
+    #[test]
+    fn test_print_scale() {
+        let file = File::create("./target/1.txt").unwrap();
+        print_scale(&file, 5_f64);
     }
 }
