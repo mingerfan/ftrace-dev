@@ -131,7 +131,7 @@ impl ElfReader {
             }
         })
     }
-
+    #[allow(dead_code)]
     pub fn func_vec(&self) -> &[Func] {
         &self.func_vec
     }

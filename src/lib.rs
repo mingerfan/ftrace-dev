@@ -10,7 +10,7 @@ pub const RC_SUCCESS_CODE: isize = 0;
 pub const MAX_PATH_LEN: usize = 300;
 
 #[no_mangle]
-pub extern "C" fn add(left: usize, right: usize) -> usize {
+pub extern "C" fn add_rust(left: usize, right: usize) -> usize {
     left + right
 }
 
@@ -40,7 +40,7 @@ fn get_string(in_string: *const c_char, m_len: usize) -> Result<String, isize> {
 }
 
 #[no_mangle]
-pub extern "C" fn print_string(in_string: *const c_char, m_len: usize) -> isize {
+pub extern "C" fn print_string_rust(in_string: *const c_char, m_len: usize) -> isize {
     let c_str_printable = get_string(in_string, m_len);
     if let Ok(r_str) = c_str_printable {
         println!("{}", r_str);
@@ -127,13 +127,13 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let result = add(2, 2);
+        let result = add_rust(2, 2);
         assert_eq!(result, 4);
     }
 
     #[test]
     fn print() {
         let c_string = CString::new("Hello").expect("Failed!");
-        assert_eq!(print_string(c_string.as_ptr(), 20), RC_SUCCESS_CODE)
+        assert_eq!(print_string_rust(c_string.as_ptr(), 20), RC_SUCCESS_CODE)
     }
 }

@@ -78,11 +78,11 @@ impl FuncInstance {
     pub fn func_type(&self) -> FunType {
         self.func_type
     }
-
+    #[allow(dead_code)]
     pub fn ret_val(&self) -> Option<(u64, Option<u64>)> {
         self.ret_val.get()
     }
-
+    #[allow(dead_code)]
     pub fn paras(&self) -> Ref<Option<Vec<u64>>> {
         self.paras.borrow()
     }
