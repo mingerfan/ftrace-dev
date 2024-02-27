@@ -187,11 +187,12 @@ pub fn check_instruction(pc: u64, inst: u32, regs: &[u64]) {
     let target_pc = if bitpattern!("???????_?????_?????_???_?????_11011_11", inst).is_some() {
         // jal
         let immj = get_imm(inst, ImmType::J);
-        immj + pc
+        (immj as u128 + pc as u128) as u64
     } else if bitpattern!("???????_?????_?????_000_?????_11001_11", inst).is_some() {
         // jalr
         let immi = get_imm(inst, ImmType::I);
-        (immi + regs[bits(inst as u64, 19, 15) as usize]) & !(bitmask(1))
+        (immi as u128 + regs[bits(inst as u64, 19, 15) as usize] as u128) as u64 
+        & !(bitmask(1))
     } else {
         return;
     };
