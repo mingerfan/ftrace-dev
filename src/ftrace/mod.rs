@@ -193,7 +193,7 @@ pub fn check_instruction(pc: u64, inst: u32, regs: &[u64]) {
         let immi = get_imm(inst, ImmType::I);
         (immi + regs[bits(inst as u64, 19, 15) as usize]) & !(bitmask(1))
     } else {
-        panic!("Unexpected behaviour")
+        return;
     };
     G_MANAGER.with(|elem| {
         let mut manager = elem.borrow_mut();
