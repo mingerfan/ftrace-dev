@@ -1,5 +1,5 @@
 [package]
-name = "ftrace-dev"
+name = "c_rustlib"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
@@ -9,7 +9,7 @@ build = "build.rs"
 cbindgen = "0.26.0"
 
 [lib]
-name = "ftrace_dev"
+name = "c_rustlib"
 crate-type = ["staticlib"]
 
 [dependencies]
