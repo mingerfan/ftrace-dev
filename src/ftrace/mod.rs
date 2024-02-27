@@ -21,6 +21,7 @@ struct ManagerBuilder {
 }
 
 #[derive(PartialEq, Eq)]
+#[non_exhaustive]
 enum ImmType {
     I,
     J,
@@ -33,7 +34,7 @@ thread_local! {
 static G_BUILDER: Mutex<Option<ManagerBuilder>> = Mutex::new(None);
 
 
-pub fn start_builder(main_path: &str) {
+pub fn start_builder(main_path: &str) -> Result<(), isize> {
     static IS_INIT: Mutex<bool> = Mutex::new(false);
 
     if !(*IS_INIT.lock().unwrap()) {
@@ -44,21 +45,25 @@ pub fn start_builder(main_path: &str) {
             main_path: main_path.to_string(),
             progs_path: None
         });
+        Ok(())
     } else {
         println!("Builder is constructed!");
+        Err(-1)
     }
 }
 
-pub fn set_show_context(show_context: bool) {
+pub fn set_show_context(show_context: bool) -> Result<(), isize> {
     let mut data = G_BUILDER.lock().unwrap();
     if let Some(x) = data.as_mut() {
         x.show_context = show_context;
+        Ok(())
     } else {
         println!("Warning: current builder is NULL!");
+        Err(-1)
     }
 }
 
-pub fn add_prog_path(path: String) {
+pub fn add_prog_path(path: String) -> Result<(), isize> {
     let mut data = G_BUILDER.lock().unwrap();
     if let Some(x) = data.as_mut() {
         if let Some(progs_path) = x.progs_path.as_mut() {
@@ -68,12 +73,14 @@ pub fn add_prog_path(path: String) {
             set.insert(path);
             x.progs_path = Some(set);
         }
+        Ok(())
     } else {
         println!("Warning: current builder is NULL");
+        Err(-1)
     }
 }
 
-pub fn build_builder() {
+pub fn build_builder() -> Result<(), isize> {
     // 贼难写这一部分，主要是Manager的接口设计的有问题
     let mut builder = G_BUILDER.lock().unwrap();
     if let Some(builder) = builder.as_mut() {
@@ -88,12 +95,15 @@ pub fn build_builder() {
                     Manager::new(builder.show_context, &builder.main_path, None)
                 };
                 *manager = Some(manager_new);
+                Ok(())
             } else {
                 println!("Warning: manager is initialized!");
+                Err(-1)
             }
         })
     } else {
         println!("Warning: current builder is NULL");
+        Err(-1)
     }
 }
 
@@ -166,6 +176,7 @@ fn get_imm(inst: u32, imm_type: ImmType) -> u64 {
             bits(i, 30, 25) << 5     |
             bits(i, 24, 21) << 1
         }
+        #[allow(unreachable_patterns)]
         _ => panic!()
     }
 }
@@ -202,7 +213,7 @@ pub fn check_instruction(pc: u64, inst: u32, regs: &[u64]) {
     });
 }
 
-pub fn print_stack(path: String) {
+pub fn print_stack(path: String) -> Result<(), isize> {
     G_MANAGER.with(|elem| {
         if let Some(ref mut manager) = *elem.borrow_mut() {
             let file = File::create(path);
@@ -225,15 +236,19 @@ pub fn print_stack(path: String) {
                         writeln!(file, "@{}, function: unknown", idx).unwrap();
                     }
                 }
+                Ok(())
             } else {
                 println!("Error: can not open file");
+                Err(-1)
             }
         } else {
             println!("Warning: Manager is NULL");
+            Err(-1)
         }
     })
 }
 
+#[allow(dead_code)]
 type LogTransItem = (Option<CurReader>, Vec<(u64, Rc<FuncInstance>)>);
 type LogTrans = Vec<LogTransItem>;
 fn log_translation(manager: &Manager) ->  LogTrans {
@@ -252,7 +267,7 @@ fn log_translation(manager: &Manager) ->  LogTrans {
                 elem.push((manager.get_time_from_index(idx), i.clone()));
             },
             None => { 
-                let func = manager.get_func_from_ins(i);
+                // let func = manager.get_func_from_ins(i);
                 hashset.insert(key, Vec::new()); 
             },
         }
@@ -264,6 +279,7 @@ fn log_translation(manager: &Manager) ->  LogTrans {
     log_vec
 }
 
+#[allow(dead_code)]
 fn print_scale(mut file: &File, scale: f64) {
     // 打印时基
     write!(file, "{:60}", "TIME_SCALE").unwrap();
@@ -273,6 +289,7 @@ fn print_scale(mut file: &File, scale: f64) {
     writeln!(file).unwrap();
 }
 
+#[allow(dead_code)]
 fn print_oneline(mut file: &File, manager: &Manager, vec_item: LogTransItem) {
     let (reader, vec) = vec_item;
     if reader.is_none() {
@@ -288,11 +305,12 @@ fn print_oneline(mut file: &File, manager: &Manager, vec_item: LogTransItem) {
     }
 }
 
+#[allow(dead_code)]
 pub fn print_log(path: String) {
     G_MANAGER.with(|elem| {
         if let Some(ref mut manager) = *elem.borrow_mut() {
             let file = File::create(path);
-            if let Ok(mut file) = file {
+            if let Ok(file) = file {
                 let log_vec = log_translation(manager);
                 let end_time = manager.get_time_base_end() as f64;
                 let scale: f64 = end_time/10000_f64; // 以分成10000份为基准

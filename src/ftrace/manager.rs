@@ -489,10 +489,10 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
 
-    const RED_START: &str = "\x1b[31m";
-    const RED_END: &str = "\x1b[0m";
-    const GREEN_START: &str = "\x1b[32m";
-    const GREEN_END: &str = "\x1b[0m";
+    // const RED_START: &str = "\x1b[31m";
+    // const RED_END: &str = "\x1b[0m";
+    // const GREEN_START: &str = "\x1b[32m";
+    // const GREEN_END: &str = "\x1b[0m";
     const BLUE_START: &str = "\x1b[34m";
     const BLUE_END: &str = "\x1b[0m";
 
