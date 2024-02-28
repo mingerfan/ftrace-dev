@@ -366,9 +366,24 @@ impl Manager {
             let reader_enum = self.elfreader_to_curreader(&self.main_reader);
             self.cur_reader = reader_enum;
             self.build_ins_and_push(reader_enum, pc, paras);
+        } else if self.prog_readers.is_none() {
+            // 这里主要应对没有传入完整的elf的情况，保证可用性的判断
+            let func_ins = FuncInstance::new_with_nullreader(0, self.get_time(), paras);
+            let func_ins = Rc::new(func_ins);
+            if let Some(x) = self.trace_log.last() {
+                if x.func_type == FunType::LocalFunc {
+                    self.trace_log_push(func_ins.clone());
+                }
+            }
+            if let Some(x) = self.func_stack.last() {
+                if x.func_type == FunType::LocalFunc {
+                    self.func_stack.push(func_ins);
+                }
+            }
         } else {
+            // 这里需要额外考虑没有传入progs reader但是有外部函数的情况
             let readers = self.prog_readers.as_ref()
-            .expect("Can not find prog readers vec, abort!");
+            .expect("Unexpected behaviour!");
             let reader_opt = readers.iter().find(|x| {
                 x.reader_cmp(pc) == Ordering::Equal
             });
