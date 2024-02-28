@@ -435,7 +435,9 @@ impl Manager {
         for func_ins in self.func_stack() {
             if func_ins.func_type != FunType::ExternalFunc {
                 let func = self.get_func_from_ins(func_ins).unwrap();
-                debug_println!("function: {}, id: {}, ins_id: {}", func.name, func.id, func_ins.id);
+                let reader = self.get_reader(&func_ins.reader.unwrap());
+                debug_println!("function: {}, id: {}, ins_id: {} in {}", 
+                func.name, func.id, func_ins.id, reader.name);
             } else {
                 debug_println!("function: unknown, ins_id: {}", func_ins.id);
             }
@@ -489,6 +491,7 @@ impl Manager {
             // 因为如果栈内没有外部函数，就不可能返回到区域外
             // 要么就是我写错了，要么就是有一些我不了解的机制
             // 这时候就直接panic了
+            self.print_stack();
             panic!("Unexpected behaviour, abort!");
         } else if self.trace_log.last()
             .expect("In ret, log can not be empty").func_type != FunType::ExternalFunc {
