@@ -427,6 +427,21 @@ impl Manager {
         }
     }
 
+    fn print_stack(&self) {
+        if self.func_stack().len() >= 500 {
+            return;
+        }
+        debug_println!("\n==========================cur stack===========================");
+        for func_ins in self.func_stack() {
+            if func_ins.func_type != FunType::ExternalFunc {
+                let func = self.get_func_from_ins(func_ins).unwrap();
+                debug_println!("function: {}, id: {}, ins_id: {}", func.name, func.id, func_ins.id);
+            } else {
+                debug_println!("function: unknown, ins_id: {}", func_ins.id);
+            }
+        }
+    }
+
     // 这里的pc需要传入返回后的第一条指令的pc，返回值则是在ret的时候收集的
     pub fn ret_pop_function(&mut self, pc: u64, ret_val: Option<(u64, Option<u64>)>) {
         // Cell救我狗命
@@ -447,6 +462,7 @@ impl Manager {
 
         if let Some((idx, target)) = res {
             if idx == self.func_stack.len() - 1 {
+                self.print_stack();
                 panic!("Ret target is on the top of ret stack, Unexpected behaviour");
             }
             let t_id = target.id;
