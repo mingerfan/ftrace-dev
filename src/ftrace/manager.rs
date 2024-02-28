@@ -427,7 +427,7 @@ impl Manager {
         }
     }
 
-    fn print_stack(&self) {
+    fn print_stack_log(&self) {
         if self.func_stack().len() >= 500 {
             return;
         }
@@ -440,6 +440,24 @@ impl Manager {
                 func.name, func.id, func_ins.id, reader.name);
             } else {
                 debug_println!("function: unknown, ins_id: {}", func_ins.id);
+            }
+        }
+
+        debug_println!("\n==========================cur vec==========================");
+        for (func_ins, time) in self.trace_log
+        .iter()
+        .zip(self.time_base.iter()) {
+            if func_ins.func_type != FunType::ExternalFunc {
+                let func = self.get_func_from_ins(func_ins).unwrap();
+                debug_println!("time: {}, function: {},\t \
+                ret_val: {:?},\t start_time: {}, end_time: {}", time, 
+                func.name,
+                func_ins.ret_val(),
+                func_ins._start_time(),
+                func_ins._end_time(),
+                );
+            } else {
+                debug_println!("time: {}, unknown function", time);
             }
         }
     }
@@ -464,7 +482,7 @@ impl Manager {
 
         if let Some((idx, target)) = res {
             if idx == self.func_stack.len() - 1 {
-                self.print_stack();
+                self.print_stack_log();
                 panic!("Ret target is on the top of ret stack, Unexpected behaviour");
             }
             let t_id = target.id;
@@ -491,7 +509,7 @@ impl Manager {
             // 因为如果栈内没有外部函数，就不可能返回到区域外
             // 要么就是我写错了，要么就是有一些我不了解的机制
             // 这时候就直接panic了
-            self.print_stack();
+            self.print_stack_log();
             panic!("Unexpected behaviour, abort!");
         } else if self.trace_log.last()
             .expect("In ret, log can not be empty").func_type != FunType::ExternalFunc {
