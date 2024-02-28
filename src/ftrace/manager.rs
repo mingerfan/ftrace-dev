@@ -431,17 +431,6 @@ impl Manager {
         if self.func_stack().len() >= 500 {
             return;
         }
-        debug_println!("\n==========================cur stack===========================");
-        for func_ins in self.func_stack() {
-            if func_ins.func_type != FunType::ExternalFunc {
-                let func = self.get_func_from_ins(func_ins).unwrap();
-                let reader = self.get_reader(&func_ins.reader.unwrap());
-                debug_println!("function: {}, id: {}, ins_id: {} in {}", 
-                func.name, func.id, func_ins.id, reader.name);
-            } else {
-                debug_println!("function: unknown, ins_id: {}", func_ins.id);
-            }
-        }
 
         debug_println!("\n==========================cur vec==========================");
         for (func_ins, time) in self.trace_log
@@ -458,6 +447,18 @@ impl Manager {
                 );
             } else {
                 debug_println!("time: {}, unknown function", time);
+            }
+        }
+
+        debug_println!("\n==========================cur stack===========================");
+        for func_ins in self.func_stack() {
+            if func_ins.func_type != FunType::ExternalFunc {
+                let func = self.get_func_from_ins(func_ins).unwrap();
+                let reader = self.get_reader(&func_ins.reader.unwrap());
+                debug_println!("function: {}, id: {}, ins_id: {} in {}", 
+                func.name, func.id, func_ins.id, reader.name);
+            } else {
+                debug_println!("function: unknown, ins_id: {}", func_ins.id);
             }
         }
     }
