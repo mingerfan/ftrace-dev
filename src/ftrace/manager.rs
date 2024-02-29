@@ -480,10 +480,11 @@ impl Manager {
             } 
             self.check_bound(item, pc)
         });
-
+        debug_println!("Ret pop PC: {}", pc);
         if let Some((idx, target)) = res {
             if idx == self.func_stack.len() - 1 {
                 self.print_stack_log();
+                // 很奇怪，明明做了校验，为什么还能跑？
                 panic!("Ret target is on the top of ret stack, Unexpected behaviour");
             }
             let t_id = target.id;
@@ -510,6 +511,7 @@ impl Manager {
             // 因为如果栈内没有外部函数，就不可能返回到区域外
             // 要么就是我写错了，要么就是有一些我不了解的机制
             // 这时候就直接panic了
+            debug_println!("Failed PC: {}", pc);
             self.print_stack_log();
             panic!("Unexpected behaviour, abort!");
         } else if self.trace_log.last()
