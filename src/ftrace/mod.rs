@@ -181,7 +181,7 @@ fn get_imm(inst: u32, imm_type: ImmType) -> u64 {
     }
 }
 
-// ret的设计有大问题，应该是存储一次，然后传入返回后的第一条指令，所以需要一个全局变量来存储
+
 pub fn check_instruction(pc: u64, inst: u32, regs: &[u64]) {
     // 这里的pc是当前指令的pc，通过这个来计算出来跳转到的地址
     let target_pc = if bitpattern!("???????_?????_?????_???_?????_11011_11", inst).is_some() {
@@ -354,6 +354,16 @@ mod test {
         check_instruction_print(0xc81ff0ef);
         // 000780e7 jalr
         check_instruction_print(0x000780e7);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_target_pc_gen() {
+        let mut vec = Vec::new();
+        for _ in 0..64 {
+            vec.push(0);
+        }
+        target_pc_gen(0, 0xfce040e3, &vec);
     }
 
     #[test]

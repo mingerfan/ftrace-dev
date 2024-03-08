@@ -480,7 +480,6 @@ impl Manager {
             } 
             self.check_bound(item, pc)
         });
-        debug_println!("Ret pop PC: 0x{:X}", pc);
         if let Some((idx, target)) = res {
             if idx == self.func_stack.len() - 1 {
                 self.print_stack_log();
