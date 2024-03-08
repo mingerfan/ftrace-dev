@@ -1,23 +1,20 @@
-mod manager;
 mod elf_reader;
-use std::{cell::RefCell, collections::HashMap, fs::File, rc::Rc, sync::Mutex};
+mod manager;
+use bitpattern::bitpattern;
 use manager::*;
 use std::collections::HashSet;
-use bitpattern::bitpattern;
 use std::io::Write;
-
+use std::{cell::RefCell, collections::HashMap, fs::File, rc::Rc, sync::Mutex};
 
 use self::elf_reader::FunType;
-
 
 // 这里用了unsafe，实际上我不会在任何多线程来修改这些数据
 // 当然，c语言侧也需要保证是单线程的
 
-
 struct ManagerBuilder {
     show_context: bool,
     main_path: String,
-    progs_path: Option<HashSet<String>>
+    progs_path: Option<HashSet<String>>,
 }
 
 #[derive(PartialEq, Eq)]
@@ -33,7 +30,6 @@ thread_local! {
 
 static G_BUILDER: Mutex<Option<ManagerBuilder>> = Mutex::new(None);
 
-
 pub fn start_builder(main_path: &str) -> Result<(), isize> {
     static IS_INIT: Mutex<bool> = Mutex::new(false);
 
@@ -43,7 +39,7 @@ pub fn start_builder(main_path: &str) -> Result<(), isize> {
         *data = Some(ManagerBuilder {
             show_context: false,
             main_path: main_path.to_string(),
-            progs_path: None
+            progs_path: None,
         });
         Ok(())
     } else {
@@ -112,15 +108,15 @@ fn sign_extend_to_u64(value: u64, bit_width: u8) -> u64 {
     if bit_width == 0 || bit_width > 64 {
         panic!("bit_width must be between 1 and 64");
     }
-    
+
     // 如果位宽已经是64位，直接返回值
     if bit_width == 64 {
         return value;
     }
-    
+
     // 创建一个掩码，它将在原始数值的符号位上有一个单一的1，其余位都是0。
     let mask = 1u64 << (bit_width - 1);
-    
+
     // 检查符号位是否被设置（是否为负数）
     if value & mask == 0 {
         // 如果符号位为0，直接返回值，因为没有符号扩展的需要
@@ -138,14 +134,13 @@ fn bits(value: u64, a: u8, b: u8) -> u64 {
     if a < b || a > 63 {
         panic!("Invalid range: a must be greater than or equal to b, and a must be less than 64.");
     }
-    
+
     // 创建一个掩码，它在位于 a 和 b 之间的每一位上都是1
     let mask = ((1u64 << (a - b + 1)) - 1) << b;
 
     // 应用掩码，然后右移 b 位
     (value & mask) >> b
 }
-
 
 fn bitmask(bits: u8) -> u64 {
     (1u64 << bits) - 1
@@ -166,21 +161,18 @@ fn check_instruction_print(inst: u32) {
 fn get_imm(inst: u32, imm_type: ImmType) -> u64 {
     let i = inst as u64;
     match imm_type {
-        ImmType::I => {
-            sign_extend_to_u64(bits(i, 31, 20), 12)
-        }
+        ImmType::I => sign_extend_to_u64(bits(i, 31, 20), 12),
         ImmType::J => {
-            sign_extend_to_u64(bits(i, 31, 31), 1) << 20 |
-            bits(i, 19, 12) << 12    |
-            bits(i, 20, 20) << 11    |
-            bits(i, 30, 25) << 5     |
-            bits(i, 24, 21) << 1
+            sign_extend_to_u64(bits(i, 31, 31), 1) << 20
+                | bits(i, 19, 12) << 12
+                | bits(i, 20, 20) << 11
+                | bits(i, 30, 25) << 5
+                | bits(i, 24, 21) << 1
         }
         #[allow(unreachable_patterns)]
-        _ => panic!()
+        _ => panic!(),
     }
 }
-
 
 pub fn check_instruction(pc: u64, inst: u32, regs: &[u64]) {
     // 这里的pc是当前指令的pc，通过这个来计算出来跳转到的地址
@@ -191,8 +183,7 @@ pub fn check_instruction(pc: u64, inst: u32, regs: &[u64]) {
     } else if bitpattern!("???????_?????_?????_000_?????_11001_11", inst).is_some() {
         // jalr
         let immi = get_imm(inst, ImmType::I);
-        (immi as u128 + regs[bits(inst as u64, 19, 15) as usize] as u128) as u64 
-        & !(bitmask(1))
+        (immi as u128 + regs[bits(inst as u64, 19, 15) as usize] as u128) as u64 & !(bitmask(1))
     } else {
         return;
     };
@@ -220,19 +211,25 @@ pub fn print_stack(path: String) -> Result<(), isize> {
             let file = File::create(path);
             if let Ok(mut file) = file {
                 let stack = manager.func_stack();
-                let stack_iter = stack.iter()
-                .enumerate()
-                .map(|(idx, elem)| {
-                    (stack.len() - (idx + 1), elem)
-                }).rev();
-                writeln!(file, "========================STACK TRACE========================").unwrap();
+                let stack_iter = stack
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, elem)| (stack.len() - (idx + 1), elem))
+                    .rev();
+                writeln!(
+                    file,
+                    "========================STACK TRACE========================"
+                )
+                .unwrap();
                 for (idx, elem) in stack_iter {
                     let func = manager.get_func_from_ins(elem);
                     if let Some(func) = func {
-                        writeln!(file, "@{}, function: {}, start: {}, end: {} ", 
-                        idx, 
-                        func.name,
-                        func.start, func.end).unwrap();
+                        writeln!(
+                            file,
+                            "@{}, function: {}, start: {}, end: {} ",
+                            idx, func.name, func.start, func.end
+                        )
+                        .unwrap();
                     } else {
                         writeln!(file, "@{}, function: unknown", idx).unwrap();
                     }
@@ -252,30 +249,31 @@ pub fn print_stack(path: String) -> Result<(), isize> {
 #[allow(dead_code)]
 type LogTransItem = (Option<CurReader>, Vec<(u64, Rc<FuncInstance>)>);
 type LogTrans = Vec<LogTransItem>;
-fn log_translation(manager: &Manager) ->  LogTrans {
+fn log_translation(manager: &Manager) -> LogTrans {
     type MyHash = HashMap<(u32, Option<CurReader>, FunType), Vec<(u64, Rc<FuncInstance>)>>;
     let log = manager.trace_log();
     let mut hashset: MyHash = HashMap::new();
     for (idx, i) in log.iter().enumerate() {
-        let key = if i.reader().is_some() { 
-            (i.id(), i.reader(), i.func_type()) 
-        } else { 
-            (0, None, FunType::ExternalFunc) 
+        let key = if i.reader().is_some() {
+            (i.id(), i.reader(), i.func_type())
+        } else {
+            (0, None, FunType::ExternalFunc)
         };
         match hashset.get_mut(&key) {
             Some(elem) => {
                 // 每一个Vec内一定是有序的，因为log就是按时间有序的
                 elem.push((manager.get_time_from_index(idx), i.clone()));
-            },
-            None => { 
+            }
+            None => {
                 // let func = manager.get_func_from_ins(i);
-                hashset.insert(key, Vec::new()); 
-            },
+                hashset.insert(key, Vec::new());
+            }
         }
     }
-    let mut log_vec = hashset.into_iter()
-    .map(|(key, val)| (key.1, val))
-    .collect::<Vec<_>>();
+    let mut log_vec = hashset
+        .into_iter()
+        .map(|(key, val)| (key.1, val))
+        .collect::<Vec<_>>();
     log_vec.sort_by_key(|(_, time_vec)| time_vec[0].0);
     log_vec
 }
@@ -285,7 +283,7 @@ fn print_scale(mut file: &File, scale: f64) {
     // 打印时基
     write!(file, "{:60}", "TIME_SCALE").unwrap();
     for i in 0..3500 {
-        write!(file, "{:>30.1}", i as f64*scale*30_f64).unwrap();
+        write!(file, "{:>30.1}", i as f64 * scale * 30_f64).unwrap();
     }
     writeln!(file).unwrap();
 }
@@ -294,13 +292,19 @@ fn print_scale(mut file: &File, scale: f64) {
 fn print_oneline(mut file: &File, manager: &Manager, vec_item: LogTransItem) {
     let (reader, vec) = vec_item;
     if reader.is_none() {
-        write!(file,"{:60}", "Unknown Reader@Unknown Function[@Unknown Address]").unwrap();
+        write!(
+            file,
+            "{:60}",
+            "Unknown Reader@Unknown Function[@Unknown Address]"
+        )
+        .unwrap();
     } else if let Some(reader) = reader {
         if vec[0].1.func_type() == FunType::LocalFunc {
-            
         } else {
-            let text = 
-            format!("{}@Unknown Function[@Unknown Address]", manager.get_reader(&reader).name);
+            let text = format!(
+                "{}@Unknown Function[@Unknown Address]",
+                manager.get_reader(&reader).name
+            );
             write!(file, "{:30}", text).unwrap();
         }
     }
@@ -314,7 +318,7 @@ pub fn print_log(path: String) {
             if let Ok(file) = file {
                 let log_vec = log_translation(manager);
                 let end_time = manager.get_time_base_end() as f64;
-                let scale: f64 = end_time/10000_f64; // 以分成10000份为基准
+                let scale: f64 = end_time / 10000_f64; // 以分成10000份为基准
                 print_scale(&file, scale);
                 for item in log_vec {
                     print_oneline(&file, manager, item);
@@ -342,7 +346,7 @@ fn target_pc_gen(pc: u64, inst: u32, regs: &[u64]) -> u64 {
     } else {
         panic!("Unexpected behaviour")
     }
-} 
+}
 
 #[cfg(test)]
 mod test {

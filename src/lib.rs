@@ -1,9 +1,9 @@
-mod utils;
 mod ftrace;
+mod utils;
 
 // 由于libc的绑定比std的ffi更全，所以不使用ffi的c_char等类型
+use libc::{c_char, c_uchar};
 use std::ffi::CStr;
-use libc::{c_char, c_uchar };
 
 pub const RC_ERROR_CODE: isize = -1;
 pub const RC_SUCCESS_CODE: isize = 0;
@@ -17,11 +17,12 @@ pub extern "C" fn add_rust(left: usize, right: usize) -> usize {
 // 简单的字符串复制可以用这种方法
 fn get_string(in_string: *const c_char, m_len: usize) -> Result<String, isize> {
     let c_string = if !in_string.is_null() {
-        let slice: &[u8] = unsafe { std::slice::from_raw_parts(in_string as *const c_uchar, m_len) };
-        match CStr::from_bytes_until_nul(slice)  {
+        let slice: &[u8] =
+            unsafe { std::slice::from_raw_parts(in_string as *const c_uchar, m_len) };
+        match CStr::from_bytes_until_nul(slice) {
             Ok(s) => s,
-            Err(_) => { 
-                println!("Warning: m_len is less than string len!"); 
+            Err(_) => {
+                println!("Warning: m_len is less than string len!");
                 return Err(RC_ERROR_CODE);
             }
         }
@@ -65,7 +66,7 @@ pub extern "C" fn start_builder(main_path: *const c_char) -> isize {
 }
 
 #[no_mangle]
-pub extern "C" fn set_show_context(show_context: bool) ->isize {
+pub extern "C" fn set_show_context(show_context: bool) -> isize {
     if ftrace::set_show_context(show_context).is_ok() {
         RC_SUCCESS_CODE
     } else {
@@ -114,7 +115,7 @@ pub extern "C" fn print_stack(path: *const c_char) -> isize {
             RC_SUCCESS_CODE
         } else {
             RC_ERROR_CODE
-        } 
+        }
     } else {
         RC_ERROR_CODE
     }
@@ -122,8 +123,8 @@ pub extern "C" fn print_stack(path: *const c_char) -> isize {
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::CString;
     use super::*;
+    use std::ffi::CString;
 
     #[test]
     fn it_works() {
